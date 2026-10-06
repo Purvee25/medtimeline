@@ -73,7 +73,7 @@ client ──JWT──▶ Django REST API ──pre-signed POST──▶ client 
 |---|---|---|
 | Trend query, 100k observations / 2k patients | **14.86 ms → 0.03 ms** (seq scan → index scan) | `python manage.py explain_trends` |
 | Cross-patient / cross-center access | Denied (404) on view, download, complete, review, trends | `tests/test_api.py`, `tests/test_workflow.py` |
-| Extraction F1, rule-based baseline (40 reports, 192 fields) | **0.901** overall: 1.000 on the 3 digital layouts, 0.548 on scans | `--extractor baseline`, see below |
+| Extraction F1, rule-based baseline (held-out, 40 reports, 178 fields) | **0.960** overall: 1.000 on the 3 digital layouts, 0.829 on scans | `--extractor baseline`, see below |
 | Extraction F1, Claude | *Not yet measured: needs API credits* | see below |
 
 To measure extraction accuracy:
@@ -85,19 +85,17 @@ python -m medtimeline_extract.pipeline --out data/predictions                   
 python -m medtimeline_eval.evaluate --truth data/synthetic --pred data/predictions_baseline
 ```
 
-**Baseline results (seed 7):**
+**Baseline results.** The OCR unit repair rule was written by looking at the seed 7 reports, so seed 99 is a held-out set nobody looked at while tuning. Quote the held-out numbers.
 
-| Layout | Precision | Recall | F1 |
-|---|---|---|---|
-| table_classic | 1.000 | 1.000 | 1.000 |
-| alias_alt_units | 1.000 | 1.000 | 1.000 |
-| inline_dotted | 1.000 | 1.000 | 1.000 |
-| scanned | 0.561 | 0.535 | 0.548 |
-| **All** | **0.905** | **0.896** | **0.901** |
+| Layout | F1, seed 7 (tuning) before → after unit fix | F1, seed 99 (held-out) before → after unit fix |
+|---|---|---|
+| table_classic | 1.000 → 1.000 | 1.000 → 1.000 |
+| alias_alt_units | 1.000 → 1.000 | 1.000 → 1.000 |
+| inline_dotted | 1.000 → 1.000 | 1.000 → 1.000 |
+| scanned | 0.548 → 0.929 | 0.683 → **0.829** |
+| **All** | 0.901 → 0.984 | 0.927 → **0.960** |
 
-**Error analysis.** On scans, every value was read correctly. 18 of the 20 misses are one OCR confusion: Tesseract reads `10^3/uL` as `1043/uL`, so the unit check rejects the row. The other 2 are rows OCR dropped entirely. The perfect digital scores are partly circular: the rules and the generator share the same marker catalogue. Real reports will be harder, and that is the gap Claude has to prove it closes.
-
-The synthetic set covers 4 layouts: a clean table; aliases with mmol/L and lakhs/cumm units; dotted lines with no table; and scanned pages (rotation, blur, noise). A field counts as correct only if marker, value (±1% after unit conversion) and unit all match.
+**Error analysis.** On scans, OCR reads values correctly; units are what break. Tesseract turns the caret in `10^3/uL` into `4`, `°`, `%` or a curly quote. `normalise_unit` now repairs those, but only when the whole string is plainly a count unit. The remaining misses are left for human review rather than guessed at: units with a lost leading digit (`403/uL`), `mo/L` for `mg/L`, and rows OCR dropped entirely. The perfect digital scores are partly circular, because the rules and the generator share the same marker catalogue. Real reports will be harder, and that is the gap Claude has to prove it closes.
 
 ## Privacy, safety and security
 
