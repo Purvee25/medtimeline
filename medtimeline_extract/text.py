@@ -28,7 +28,8 @@ def _check_pdf(path: Path) -> None:
 
 
 def _text_layer(path: Path) -> str:
-    return "\n".join(page.extract_text() or "" for page in PdfReader(path).pages)
+    # Layout mode keeps table rows on one line; the default emits one cell per line.
+    return "\n".join(page.extract_text(extraction_mode="layout") or "" for page in PdfReader(path).pages)
 
 
 def _ocr(path: Path) -> str:

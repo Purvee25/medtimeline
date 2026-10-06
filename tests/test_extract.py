@@ -81,3 +81,29 @@ def test_llm_failure_marks_report_failed_without_raising(tmp_path, monkeypatch):
     monkeypatch.setattr(pipeline, "extract_results", boom)
     out = process_report(tmp_path / "r1.pdf", client=None)
     assert out["status"] == Status.FAILED and out["results"] == []
+
+
+def test_baseline_reads_table_dotted_and_alias_rows():
+    from medtimeline_extract.baseline import extract_baseline
+
+    text = (
+        "Sample collected: 24/12/2025\n"
+        "HGB                 14.8        g/dL        12.0 - 17.0\n"
+        "Red Blood Cell Count 3.82 L     10^6/uL     4.20 - 5.90\n"
+        "HDL Cholesterol ............... 1.10 mmol/L  (1.03 - 1.55)\n"
+        "Investigation  Observed Value  Units\n"
+    )
+    out = extract_baseline(text)
+    assert out.collected_on == date(2025, 12, 24)
+    assert [(r.marker.value, r.value, r.unit) for r in out.results] == [
+        ("hb", 14.8, "g/dL"),
+        ("rbc", 3.82, "10^6/uL"),
+        ("hdl", 1.10, "mmol/L"),
+    ]
+
+
+def test_baseline_prefers_longest_label():
+    from medtimeline_extract.baseline import extract_baseline
+
+    (row,) = extract_baseline("LDL Cholesterol 120 mg/dL").results
+    assert row.marker.value == "ldl"
