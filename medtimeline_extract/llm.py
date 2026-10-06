@@ -1,6 +1,7 @@
 """Claude call that turns redacted report text into structured lab results."""
 
 import logging
+from datetime import date
 from enum import Enum
 
 import anthropic
@@ -15,7 +16,7 @@ FALLBACK_MODEL = "claude-opus-4-8"
 FALLBACK_BETA = "server-side-fallback-2026-06-01"
 MAX_TOKENS = 16000
 EFFORT = "medium"
-PROMPT_VERSION = "v1"
+PROMPT_VERSION = "v2"
 
 MarkerCode = Enum("MarkerCode", {code: code for code in [*MARKERS, "unknown"]}, type=str)
 
@@ -32,6 +33,7 @@ class ExtractedResult(BaseModel):
 class Extraction(BaseModel):
     """All results found in one report."""
 
+    collected_on: date | None = Field(description="Sample collection date, or null if not printed")
     results: list[ExtractedResult]
 
 
@@ -57,7 +59,8 @@ catalogue codes, or "unknown" if none fits:
 {_catalogue()}
 
 OCR can garble characters (e.g. "g/dl", "1O^3/uL"); map to the intended marker and unit when the \
-intent is clear. If there are no results, return an empty list."""
+intent is clear. If there are no results, return an empty list. Also return the sample \
+collection date if printed, otherwise null."""
 
 
 class ExtractionRefused(RuntimeError):
@@ -83,8 +86,12 @@ def extract_results(text: str, client: anthropic.Anthropic) -> Extraction:
     )
     logger.info(
         "Extraction call done",
-        extra={"request_id": response._request_id, "model": response.model,
-               "input_tokens": response.usage.input_tokens, "output_tokens": response.usage.output_tokens},
+        extra={
+            "request_id": response._request_id,
+            "model": response.model,
+            "input_tokens": response.usage.input_tokens,
+            "output_tokens": response.usage.output_tokens,
+        },
     )
     if response.stop_reason == "refusal":
         raise ExtractionRefused(f"Refused (request {response._request_id})")
