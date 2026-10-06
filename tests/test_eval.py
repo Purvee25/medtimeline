@@ -4,7 +4,7 @@ import pytest
 
 from medtimeline_eval.evaluate import evaluate, score_report
 from medtimeline_eval.generate import LAYOUTS, generate_dataset
-from medtimeline_eval.markers import MARKERS, is_plausible, to_canonical
+from medtimeline_eval.markers import MARKERS, is_plausible, normalise_unit, to_canonical
 
 
 def _perfect_prediction(truth: dict) -> dict:
@@ -68,3 +68,25 @@ def test_wrong_value_and_duplicates_are_penalised():
 def test_empty_truth_dir_raises(tmp_path):
     with pytest.raises(FileNotFoundError):
         evaluate(tmp_path, tmp_path)
+
+
+@pytest.mark.parametrize(
+    "ocr,expected",
+    [
+        ("1043/uL", "10^3/uL"),
+        ("1046/uL", "10^6/uL"),
+        ("103/ul", "10^3/uL"),
+        ("10*3/µL", "10^3/uL"),
+        ("10^6/pL", "10^6/uL"),
+        ("10°6/uL", "10^6/uL"),
+        ("10\u20196/uL", "10^6/uL"),  # curly-quote caret
+        ("10%6/uL", "10^6/uL"),
+    ],
+)
+def test_normalise_unit_repairs_ocr_caret(ocr, expected):
+    assert normalise_unit(ocr) == expected
+
+
+@pytest.mark.parametrize("unit", ["1043/mL", "10435/uL", "403/uL", "mo/L", "g/dL", "mg/L"])
+def test_normalise_unit_leaves_other_units_alone(unit):
+    assert normalise_unit(unit) == unit

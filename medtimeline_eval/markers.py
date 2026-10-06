@@ -4,6 +4,7 @@ Single source of truth shared by the synthetic generator, the evaluator and
 (later) the extraction pipeline's validation step.
 """
 
+import re
 from dataclasses import dataclass, field
 
 
@@ -139,10 +140,21 @@ _UNIT_SYNONYMS = {
 }
 
 
+# OCR misreads the caret in "10^3/uL" as "4" ("1043/uL"), as a punctuation glyph ("10°6/uL",
+# "10%6/uL", a curly quote), or drops it ("103/uL"); "µ" comes back as "u" or "p". Anchored to the
+# whole string so it only rewrites what is plainly a count unit. Lost leading digits ("403/uL")
+# are deliberately not guessed at: those rows go to review.
+_OCR_POWER_UNIT = re.compile(r"^10(?:4|[^\w\s/])?(?P<exp>[36])/[uµp]l$")
+
+
 def normalise_unit(unit: str) -> str:
-    """Return a unit string in canonical spelling (case/whitespace-insensitive)."""
+    """Return a unit string in canonical spelling (case/whitespace-insensitive, OCR-tolerant)."""
     key = unit.strip().replace(" ", "").lower()
-    return _UNIT_SYNONYMS.get(key, unit.strip())
+    if key in _UNIT_SYNONYMS:
+        return _UNIT_SYNONYMS[key]
+    if match := _OCR_POWER_UNIT.match(key):
+        return f"10^{match['exp']}/uL"
+    return unit.strip()
 
 
 def to_canonical(code: str, value: float, unit: str) -> float:
