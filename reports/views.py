@@ -13,7 +13,9 @@ from accounts.models import Consent, User
 
 from . import storage
 from .models import AccessLog, Report
-from .serializers import ReportCreateSerializer, ReportSerializer
+from .serializers import ObservationSerializer, ReportCreateSerializer, ReportSerializer, ReviewSerializer
+from .services import ReviewedValue, ReviewError, apply_review
+from .tasks import extract_report
 
 logger = logging.getLogger(__name__)
 
@@ -56,9 +58,7 @@ class ReportViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.G
         serializer = ReportCreateSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         patient: User = serializer.validated_data["patient"]
-        has_consent = patient.consents.filter(
-            purpose=Consent.Purpose.STORE_REPORTS, withdrawn_at__isnull=True
-        ).exists()
+        has_consent = patient.consents.filter(purpose=Consent.Purpose.STORE_REPORTS, withdrawn_at__isnull=True).exists()
         if not has_consent:
             raise PermissionDenied("Patient has not consented to report storage.")
 
@@ -75,6 +75,38 @@ class ReportViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.G
             {"report": ReportSerializer(report).data, "upload": storage.presigned_upload(report.s3_key)},
             status=status.HTTP_201_CREATED,
         )
+
+    @action(detail=True, methods=["get"])
+    def observations(self, request: Request, pk: str | None = None) -> Response:
+        """Stored values plus the raw extraction (with validation issues) for the reviewer."""
+        report = self.get_object()
+        _log(request, AccessLog.Action.VIEW, report)
+        return Response(
+            {
+                "report": ReportSerializer(report).data,
+                "extraction": report.extraction,
+                "observations": ObservationSerializer(report.observations.order_by("marker_code"), many=True).data,
+            }
+        )
+
+    @action(detail=True, methods=["post"])
+    def review(self, request: Request, pk: str | None = None) -> Response:
+        """Replace the report's values with human-verified ones and mark it extracted."""
+        report = self.get_object()
+        reviewable = {Report.Status.NEEDS_REVIEW, Report.Status.EXTRACTED, Report.Status.FAILED}
+        if report.status not in reviewable:
+            return Response(
+                {"detail": f"Report is {report.status}; cannot review yet."}, status=status.HTTP_409_CONFLICT
+            )
+        serializer = ReviewSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        rows = [ReviewedValue(**o) for o in serializer.validated_data["observations"]]
+        try:
+            apply_review(report, serializer.validated_data["collected_on"], rows)
+        except ReviewError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        _log(request, AccessLog.Action.REVIEW, report)
+        return Response(ObservationSerializer(report.observations.order_by("marker_code"), many=True).data)
 
     @action(detail=True, methods=["post"])
     def complete(self, request: Request, pk: str | None = None) -> Response:
@@ -93,6 +125,7 @@ class ReportViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.G
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         report.status = Report.Status.UPLOADED
         report.save(update_fields=["size_bytes", "status", "updated_at"])
+        transaction.on_commit(lambda: extract_report.delay(str(report.pk)))
         return Response(ReportSerializer(report).data)
 
     @action(detail=True, methods=["get"])

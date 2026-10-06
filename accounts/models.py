@@ -26,8 +26,7 @@ class User(AbstractUser):
             models.CheckConstraint(
                 name="staff_has_center_patient_has_none",
                 condition=(
-                    models.Q(role="center_staff", center__isnull=False)
-                    | models.Q(role="patient", center__isnull=True)
+                    models.Q(role="center_staff", center__isnull=False) | models.Q(role="patient", center__isnull=True)
                 ),
             )
         ]

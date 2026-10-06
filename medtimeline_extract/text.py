@@ -35,7 +35,9 @@ def _ocr(path: Path) -> str:
     with tempfile.TemporaryDirectory() as tmp:
         subprocess.run(
             ["pdftoppm", "-r", str(OCR_DPI), "-gray", "-png", str(path), f"{tmp}/page"],
-            check=True, capture_output=True, timeout=OCR_TIMEOUT_S,
+            check=True,
+            capture_output=True,
+            timeout=OCR_TIMEOUT_S,
         )
         pages = sorted(Path(tmp).glob("page*.png"))
         # psm 6: assume a uniform block of text — keeps table rows on one line.

@@ -6,7 +6,7 @@ from .models import Center, Consent, User
 
 @admin.register(User)
 class MedTimelineUserAdmin(UserAdmin):
-    fieldsets = UserAdmin.fieldsets + (("Role", {"fields": ("role", "center")}),)
+    fieldsets = (*UserAdmin.fieldsets, ("Role", {"fields": ("role", "center")}))
     list_display = ("username", "email", "role", "center")
 
 

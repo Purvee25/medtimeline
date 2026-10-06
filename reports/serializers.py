@@ -2,8 +2,9 @@ from django.conf import settings
 from rest_framework import serializers
 
 from accounts.models import User
+from medtimeline_eval.markers import MARKERS
 
-from .models import Report
+from .models import Observation, Report
 
 
 class ReportSerializer(serializers.ModelSerializer):
@@ -12,7 +13,17 @@ class ReportSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Report
-        fields = ["id", "patient", "center", "original_filename", "size_bytes", "status", "collected_on", "created_at"]
+        fields = [
+            "id",
+            "patient",
+            "center",
+            "original_filename",
+            "size_bytes",
+            "status",
+            "collected_on",
+            "error",
+            "created_at",
+        ]
         read_only_fields = fields
 
 
@@ -42,3 +53,31 @@ class ReportCreateSerializer(serializers.Serializer):
         if user.is_patient:
             attrs["patient"] = user
         return attrs
+
+
+class ObservationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Observation
+        fields = [
+            "id",
+            "marker_code",
+            "loinc",
+            "value",
+            "unit",
+            "canonical_value",
+            "canonical_unit",
+            "effective_date",
+            "verified",
+        ]
+        read_only_fields = fields
+
+
+class ReviewedValueSerializer(serializers.Serializer):
+    marker_code = serializers.ChoiceField(choices=list(MARKERS))
+    value = serializers.FloatField()
+    unit = serializers.CharField(max_length=30)
+
+
+class ReviewSerializer(serializers.Serializer):
+    collected_on = serializers.DateField()
+    observations = ReviewedValueSerializer(many=True, allow_empty=False)

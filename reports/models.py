@@ -27,6 +27,9 @@ class Report(models.Model):
     size_bytes = models.PositiveIntegerField()
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.AWAITING_UPLOAD)
     collected_on = models.DateField(null=True, blank=True)
+    # Raw pipeline output (rows + validation issues) shown to the reviewer; never contains identifiers.
+    extraction = models.JSONField(null=True, blank=True)
+    error = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -55,7 +58,9 @@ class Observation(models.Model):
     verified = models.BooleanField(default=False)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["report", "marker_code"], name="one_value_per_marker_per_report")]
+        constraints = [
+            models.UniqueConstraint(fields=["report", "marker_code"], name="one_value_per_marker_per_report")
+        ]
         # Serves the trend query: one patient, one marker, ordered by date.
         indexes = [models.Index(fields=["patient", "loinc", "effective_date"])]
 
@@ -68,8 +73,12 @@ class AccessLog(models.Model):
         VIEW = "view"
         DOWNLOAD = "download"
         LIST = "list"
+        REVIEW = "review"
+        EXPORT = "export"
+        ERASE = "erase"
 
-    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+")
+    # SET_NULL so account erasure keeps a de-identified audit trail instead of blocking deletion.
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+")
     patient = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL, related_name="+")
     report = models.ForeignKey(Report, null=True, on_delete=models.SET_NULL, related_name="+")
     action = models.CharField(max_length=20, choices=Action.choices)

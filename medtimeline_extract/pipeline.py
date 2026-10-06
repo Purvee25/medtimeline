@@ -58,14 +58,14 @@ def validate(row: ExtractedResult) -> ValidatedResult:
     return result
 
 
-def process_report(pdf: Path, client: anthropic.Anthropic) -> dict:
-    """Run the full pipeline on one PDF; never raises, failures become status=failed."""
-    try:
-        text, method = extract_text(pdf)
-        extraction = extract_results(redact_identifiers(text), client)
-    except Exception as exc:  # noqa: BLE001 - one bad report must not stop the batch
-        logger.exception("Extraction failed", extra={"file": pdf.name})
-        return {"status": Status.FAILED, "error": f"{type(exc).__name__}: {exc}", "results": []}
+def analyse_report(pdf: Path, client: anthropic.Anthropic) -> dict:
+    """Run the full pipeline on one PDF.
+
+    Raises:
+        Whatever text extraction or the Claude call raises; callers decide on retry.
+    """
+    text, method = extract_text(pdf)
+    extraction = extract_results(redact_identifiers(text), client)
 
     rows = [validate(r) for r in extraction.results]
     markers = [r.marker for r in rows if r.marker in MARKERS]
@@ -73,13 +73,23 @@ def process_report(pdf: Path, client: anthropic.Anthropic) -> dict:
         for r in rows:
             if markers.count(r.marker) > 1:
                 r.issues.append("duplicate_marker")
-    status = Status.NEEDS_REVIEW if not rows or any(r.issues for r in rows) else Status.EXTRACTED
+    needs_review = not rows or extraction.collected_on is None or any(r.issues for r in rows)
     return {
-        "status": status,
+        "status": Status.NEEDS_REVIEW if needs_review else Status.EXTRACTED,
         "text_method": method,
         "prompt_version": PROMPT_VERSION,
+        "collected_on": extraction.collected_on.isoformat() if extraction.collected_on else None,
         "results": [asdict(r) for r in rows],
     }
+
+
+def process_report(pdf: Path, client: anthropic.Anthropic) -> dict:
+    """Like `analyse_report`, but never raises: failures become status=failed."""
+    try:
+        return analyse_report(pdf, client)
+    except Exception as exc:
+        logger.exception("Extraction failed", extra={"file": pdf.name})
+        return {"status": Status.FAILED, "error": f"{type(exc).__name__}: {exc}", "results": []}
 
 
 def run(reports_dir: Path, out_dir: Path) -> dict[str, int]:

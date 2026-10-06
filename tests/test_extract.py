@@ -1,12 +1,13 @@
+import random
+from datetime import date
+
 import pytest
 
 from medtimeline_eval.generate import generate_report
 from medtimeline_extract import pipeline
-from medtimeline_extract.llm import Extraction, ExtractedResult
+from medtimeline_extract.llm import ExtractedResult, Extraction
 from medtimeline_extract.pipeline import Status, process_report, validate
 from medtimeline_extract.text import extract_text, redact_identifiers
-
-import random
 
 
 def _row(marker: str, value: float, unit: str) -> ExtractedResult:
@@ -39,17 +40,20 @@ def test_validate_converts_alt_units():
     assert validate(_row("chol", 5.17, "mmol/l")).canonical_value == pytest.approx(200, rel=0.01)
 
 
-@pytest.mark.parametrize("row,issue", [
-    (_row("hb", 132.0, "g/dL"), "implausible_value"),
-    (_row("hb", 13.2, "mmol/L"), "unit_mismatch"),
-    (_row("unknown", 1.0, "x"), "unrecognised_marker"),
-])
+@pytest.mark.parametrize(
+    "row,issue",
+    [
+        (_row("hb", 132.0, "g/dL"), "implausible_value"),
+        (_row("hb", 13.2, "mmol/L"), "unit_mismatch"),
+        (_row("unknown", 1.0, "x"), "unrecognised_marker"),
+    ],
+)
 def test_validate_flags_suspicious_rows(row, issue):
     assert validate(row).issues == [issue]
 
 
 def _fake_extract(results):
-    return lambda text, client: Extraction(results=results)
+    return lambda text, client: Extraction(collected_on=date(2025, 1, 2), results=results)
 
 
 def test_clean_report_is_extracted(tmp_path, monkeypatch):
@@ -60,7 +64,9 @@ def test_clean_report_is_extracted(tmp_path, monkeypatch):
 
 def test_suspicious_or_empty_report_needs_review(tmp_path, monkeypatch):
     generate_report("r1", "table_classic", random.Random(1), tmp_path)
-    monkeypatch.setattr(pipeline, "extract_results", _fake_extract([_row("hb", 13.0, "g/dL"), _row("hb", 13.0, "g/dL")]))
+    monkeypatch.setattr(
+        pipeline, "extract_results", _fake_extract([_row("hb", 13.0, "g/dL"), _row("hb", 13.0, "g/dL")])
+    )
     assert process_report(tmp_path / "r1.pdf", client=None)["status"] == Status.NEEDS_REVIEW
     monkeypatch.setattr(pipeline, "extract_results", _fake_extract([]))
     assert process_report(tmp_path / "r1.pdf", client=None)["status"] == Status.NEEDS_REVIEW

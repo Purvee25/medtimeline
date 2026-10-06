@@ -53,9 +53,13 @@ def test_missing_prediction_counts_as_missed():
 
 def test_wrong_value_and_duplicates_are_penalised():
     truth = {"layout": "x", "results": [{"marker": "hb", "canonical_value": 13.0}]}
-    pred = {"results": [{"marker": "hb", "value": 13.0, "unit": "g/dL"},
-                        {"marker": "hb", "value": 13.0, "unit": "g/dL"},
-                        {"marker": "wbc", "value": 7, "unit": "10^3/uL"}]}
+    pred = {
+        "results": [
+            {"marker": "hb", "value": 13.0, "unit": "g/dL"},
+            {"marker": "hb", "value": 13.0, "unit": "g/dL"},
+            {"marker": "wbc", "value": 7, "unit": "10^3/uL"},
+        ]
+    }
     score = score_report(truth, pred)
     assert (score.correct, score.predicted) == (1, 3)
     assert score_report(truth, {"results": [{"marker": "hb", "value": 1.3, "unit": "g/dL"}]}).correct == 0
