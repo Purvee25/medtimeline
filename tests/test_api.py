@@ -1,53 +1,12 @@
-import boto3
 import pytest
 from django.conf import settings
-from moto import mock_aws
 from rest_framework.test import APIClient
 
 from accounts.models import Center, Consent, User
-from reports import storage
 from reports.models import AccessLog, Report
+from tests.helpers import PASSWORD, _as, _create_report, _patient, _staff
 
 pytestmark = pytest.mark.django_db
-PASSWORD = "correct-horse-battery-9"
-
-
-@pytest.fixture(autouse=True)
-def s3(monkeypatch):
-    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "testing")
-    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "testing")
-    with mock_aws():
-        storage._client.cache_clear()
-        client = boto3.client("s3", region_name=settings.AWS_REGION)
-        client.create_bucket(
-            Bucket=settings.REPORTS_BUCKET,
-            CreateBucketConfiguration={"LocationConstraint": settings.AWS_REGION},
-        )
-        yield client
-    storage._client.cache_clear()
-
-
-def _patient(username: str, consent: bool = True) -> User:
-    user = User.objects.create_user(username=username, password=PASSWORD)
-    if consent:
-        Consent.objects.create(user=user, purpose=Consent.Purpose.STORE_REPORTS, policy_version="test")
-    return user
-
-
-def _staff(username: str, center: Center) -> User:
-    return User.objects.create_user(username=username, password=PASSWORD, role=User.Role.CENTER_STAFF, center=center)
-
-
-def _as(user: User) -> APIClient:
-    client = APIClient()
-    client.force_authenticate(user)
-    return client
-
-
-def _create_report(user: User, **extra) -> dict:
-    response = _as(user).post("/api/reports/", {"original_filename": "cbc.pdf", "size_bytes": 1000, **extra})
-    assert response.status_code == 201, response.data
-    return response.data
 
 
 # --- auth -----------------------------------------------------------------
@@ -109,7 +68,10 @@ def test_staff_see_only_their_centers_reports():
 
 def test_staff_must_name_patient_and_patient_cannot_upload_for_others():
     center = Center.objects.create(name="A")
-    assert _as(_staff("s", center)).post("/api/reports/", {"original_filename": "a.pdf", "size_bytes": 10}).status_code == 400
+    assert (
+        _as(_staff("s", center)).post("/api/reports/", {"original_filename": "a.pdf", "size_bytes": 10}).status_code
+        == 400
+    )
 
     alice, _ = _patient("alice"), _patient("bob")
     data = _create_report(alice, patient="bob")
@@ -126,11 +88,14 @@ def test_upload_blocked_without_consent():
 # --- upload flow ----------------------------------------------------------
 
 
-@pytest.mark.parametrize("payload", [
-    {"original_filename": "a.exe", "size_bytes": 10},
-    {"original_filename": "a.pdf", "size_bytes": 10**9},
-    {"original_filename": "a.pdf", "size_bytes": 0},
-])
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"original_filename": "a.exe", "size_bytes": 10},
+        {"original_filename": "a.pdf", "size_bytes": 10**9},
+        {"original_filename": "a.pdf", "size_bytes": 0},
+    ],
+)
 def test_create_rejects_bad_metadata(payload):
     assert _as(_patient("alice")).post("/api/reports/", payload).status_code == 400
 

@@ -3,22 +3,49 @@ name = "medtimeline"
 version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
-    "reportlab==5.0.0", "pillow==11.3.0", "anthropic==0.116.0", "pydantic==2.13.5",
-    "pypdf==6.14.2", "pytesseract==0.3.13",
-    "Django==6.1.1", "djangorestframework==3.18.1", "djangorestframework-simplejwt==5.5.1",
-    "boto3==1.43.108", "psycopg[binary]==3.3.6", "dj-database-url==3.1.2",
+    "anthropic==1.11.0",
+    "boto3==1.43.108",
+    "celery==5.6.3",
+    "dj-database-url==3.1.2",
+    "Django==6.1.1",
+    "djangorestframework==3.18.1",
+    "djangorestframework-simplejwt==5.5.1",
+    "gunicorn==23.0.0",
+    "pillow==12.3.0",
+    "psycopg[binary]==3.3.6",
+    "pydantic==2.13.5",
+    "pypdf==6.19.0",
+    "pytesseract==0.3.13",
+    "redis==8.1.0",
+    "reportlab==5.0.1",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest==8.3.4", "pytest-django==4.14.0", "moto==5.2.3", "ruff==0.13.3", "black==25.9.0"]
+dev = ["pytest==9.1.1", "pytest-django==4.14.0", "moto==5.2.3", "ruff==0.16.10", "black==26.10.0"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-DJANGO_SETTINGS_MODULE = "config.settings"
+DJANGO_SETTINGS_MODULE = "config.settings_test"
 
 [tool.ruff]
 line-length = 120
+extend-exclude = ["*/migrations/*"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S", "BLE", "RUF"]
+# RUF012 flags Django/DRF class attributes (Meta.fields etc.).
+# S311: random is only used for seeded synthetic data, never for secrets.
+ignore = ["RUF012", "S311"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "S105", "S106"]
+"config/settings_test.py" = ["F403", "F405", "E402"]
+# Fixed argv list (no shell); pdftoppm resolved from PATH like any system tool.
+"medtimeline_extract/text.py" = ["S603", "S607"]
 
 [tool.black]
 line-length = 120
+
+[tool.setuptools.packages.find]
+include = ["config*", "accounts*", "reports*", "medtimeline_eval*", "medtimeline_extract*"]

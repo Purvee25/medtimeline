@@ -61,3 +61,11 @@ def verify_upload(key: str) -> int:
         s3.delete_object(Bucket=bucket, Key=key)
         raise UploadVerificationError("File is not a valid PDF within the size limit.")
     return size
+
+
+def download_to(key: str, path) -> None:
+    _client().download_file(settings.REPORTS_BUCKET, key, str(path))
+
+
+def delete(key: str) -> None:
+    _client().delete_object(Bucket=settings.REPORTS_BUCKET, Key=key)

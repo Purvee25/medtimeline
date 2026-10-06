@@ -130,13 +130,13 @@ def _draw_pdf(path: Path, meta: dict, panels: dict[str, list[ResultRow]], layout
                 pdf.drawString(50, y, f"{label} {'.' * max(4, 40 - len(label))} {value} {unit}  ({ref})")
                 y -= 16
         else:
-            for x, heading in zip(columns, headings):
+            for x, heading in zip(columns, headings, strict=True):
                 pdf.drawString(x, y, heading)
             y -= 4
             pdf.line(50, y, PAGE_W - 50, y)
             y -= 14
             for row in rows:
-                for x, text in zip(columns, _row_text(row)):
+                for x, text in zip(columns, _row_text(row), strict=True):
                     pdf.drawString(x, y, text)
                 y -= 16
         y -= 20
@@ -173,11 +173,11 @@ def _draw_scanned(path: Path, meta: dict, panels: dict[str, list[ResultRow]], rn
     for panel, rows in panels.items():
         text(50, y, panel.upper())
         y += 18
-        for x, heading in zip((50, 230, 330, 420), ("Test", "Result", "Unit", "Reference Range")):
+        for x, heading in zip((50, 230, 330, 420), ("Test", "Result", "Unit", "Reference Range"), strict=True):
             text(x, y, heading)
         y += 18
         for row in rows:
-            for x, s in zip((50, 230, 330, 420), _row_text(row)):
+            for x, s in zip((50, 230, 330, 420), _row_text(row), strict=True):
                 text(x, y, s)
             y += 18
         y += 20

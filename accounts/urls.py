@@ -7,4 +7,5 @@ urlpatterns = [
     path("token/", views.ThrottledTokenObtainPairView.as_view(), name="token"),
     path("token/refresh/", views.ThrottledTokenRefreshView.as_view(), name="token-refresh"),
     path("me/", views.MeView.as_view(), name="me"),
+    path("consents/", views.ConsentView.as_view(), name="consents"),
 ]
