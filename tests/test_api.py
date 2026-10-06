@@ -144,3 +144,8 @@ def test_staff_cannot_complete_upload_started_by_patient():
     report.center = center
     report.save()
     assert _as(_staff("s", center)).post(f"/api/reports/{report.pk}/complete/").status_code == 403
+
+
+def test_healthz_reports_ok():
+    response = APIClient().get("/healthz")
+    assert response.status_code == 200 and response.json() == {"status": "ok"}

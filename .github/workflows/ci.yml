@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: medtimeline
+          POSTGRES_PASSWORD: medtimeline
+          POSTGRES_DB: medtimeline
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U medtimeline" --health-interval 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://medtimeline:medtimeline@localhost:5432/medtimeline
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: System packages (OCR)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tesseract-ocr poppler-utils
+      - name: Install
+        run: pip install -e ".[dev]"
+      - name: Lint
+        run: |
+          ruff check .
+          black --check --exclude '/(\.venv|migrations)/' .
+      - name: Migrations are up to date
+        run: python manage.py makemigrations --check --dry-run --settings=config.settings_test
+      - name: Test
+        run: pytest -q
