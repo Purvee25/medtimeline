@@ -1,0 +1,10 @@
+__pycache__/
+.venv/
+.pytest_cache/
+# Generated synthetic data (reproducible from seed)
+data/
+# Never commit real reports
+real_reports/
+*.real.pdf
+.env
+*.egg-info/
