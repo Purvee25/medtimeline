@@ -4,6 +4,7 @@ import type { Me } from './api/schemas'
 export type AuthState =
   | { status: 'loading' }
   | { status: 'signed_out' }
+  | { status: 'offline' }
   | { status: 'signed_in'; user: Me }
 
 export type Registration = {

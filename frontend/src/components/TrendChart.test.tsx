@@ -28,11 +28,13 @@ describe('TrendChart', () => {
   it('reads values with the keyboard', () => {
     render(<TrendChart trend={trend} />)
     const chart = screen.getByRole('img')
+    const live = screen.getByRole('status')
+    expect(live).toBeEmptyDOMElement()
     fireEvent.keyDown(chart, { key: 'ArrowRight' })
-    expect(screen.getByRole('status')).toHaveTextContent('3 mg/L')
-    expect(screen.getByRole('status')).toHaveTextContent('Apex · Not yet reviewed')
+    expect(live).toHaveTextContent('3 mg/L')
+    expect(live).toHaveTextContent('Apex, Not yet reviewed')
     fireEvent.keyDown(chart, { key: 'ArrowRight' })
-    expect(screen.getByRole('status')).toHaveTextContent('Self-uploaded · Verified')
+    expect(live).toHaveTextContent('Self-uploaded, Verified')
   })
 
   it('handles a single result without dividing by zero', () => {
@@ -56,4 +58,13 @@ describe('formatValue', () => {
   ])('formats %s as %s', (value, expected) => {
     expect(formatValue(value)).toBe(expected)
   })
+})
+
+it('keeps one persistent live region and stays silent on hover', () => {
+  const { container } = render(<TrendChart trend={trend} />)
+  const svg = container.querySelector('svg') as SVGSVGElement
+  fireEvent.pointerMove(svg, { clientX: 10 })
+  expect(screen.getAllByRole('status')).toHaveLength(1)
+  expect(screen.getByRole('status')).toBeEmptyDOMElement()
+  expect(container.querySelector('.tooltip')).toHaveAttribute('aria-hidden', 'true')
 })

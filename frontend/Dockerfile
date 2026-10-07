@@ -6,8 +6,11 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM nginx:1.29-alpine AS runtime
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Unprivileged image: runs as uid 101 and listens on 8080.
+FROM nginxinc/nginx-unprivileged:1.29-alpine AS runtime
+# Rendered by the image's entrypoint (envsubst) into /etc/nginx/conf.d/default.conf at start-up.
+COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
-EXPOSE 80
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget -qO- http://127.0.0.1/ >/dev/null || exit 1
+ENV API_UPSTREAM=http://web:8000 S3_ORIGIN=https://s3.ap-south-1.amazonaws.com
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget -qO- http://127.0.0.1:8080/ >/dev/null || exit 1

@@ -63,6 +63,8 @@ export function TrendChart({ trend }: Props) {
   const width = Math.max(useWidth(figureRef), MARGIN.left + MARGIN.right + 1)
   const plotW = width - MARGIN.left - MARGIN.right
   const [active, setActive] = useState<number | null>(null)
+  // Screen-reader announcement, set only by keyboard navigation so mouse movement stays silent.
+  const [announcement, setAnnouncement] = useState('')
   const { points, reference_range: range, unit } = trend
 
   const geometry = useMemo(() => {
@@ -107,7 +109,14 @@ export function TrendChart({ trend }: Props) {
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
     event.preventDefault()
     const step = event.key === 'ArrowRight' ? 1 : -1
-    setActive((i) => Math.min(points.length - 1, Math.max(0, (i ?? (step > 0 ? -1 : points.length)) + step)))
+    const next = Math.min(points.length - 1, Math.max(0, (active ?? (step > 0 ? -1 : points.length)) + step))
+    setActive(next)
+    const p = points[next]
+    if (p) {
+      const source = p.center ?? 'Self-uploaded'
+      const state = p.verified ? 'Verified' : 'Not yet reviewed'
+      setAnnouncement(`${formatValue(p.value)} ${unit}, ${dateFmt.format(parseDay(p.date))}, ${source}, ${state}`)
+    }
   }
 
   const activePoint: TrendPoint | undefined = active === null ? undefined : points[active]
@@ -185,7 +194,7 @@ export function TrendChart({ trend }: Props) {
         <div
           className="tooltip"
           style={{ left: activeX, top: y(activePoint.value) }}
-          role="status"
+          aria-hidden="true"
         >
           <strong>
             {formatValue(activePoint.value)} {unit}
@@ -196,6 +205,10 @@ export function TrendChart({ trend }: Props) {
           </div>
         </div>
       )}
+
+      <p className="visually-hidden" role="status" aria-live="polite">
+        {announcement}
+      </p>
 
       <figcaption className="legend">
         <span>

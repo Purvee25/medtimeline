@@ -48,13 +48,12 @@ export function SignIn() {
           <p className="muted">Your lab results from every center, on one timeline.</p>
         </div>
 
-        <div className="tabs" role="tablist" aria-label="Account">
+        <div className="tabs" role="group" aria-label="Account">
           {(['sign_in', 'register'] as const).map((m) => (
             <button
               key={m}
               type="button"
-              role="tab"
-              aria-selected={mode === m}
+              aria-pressed={mode === m}
               onClick={() => {
                 setMode(m)
                 setError(null)

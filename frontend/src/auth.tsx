@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
-import { api, session } from './api/client'
+import { api, ApiError, session } from './api/client'
 import { Me, Tokens } from './api/schemas'
 import { AuthContext, type AuthState, type Registration } from './authContext'
 
@@ -11,7 +11,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const signOut = useCallback(() => {
-    session.clear()
+    void session.logout()
     queryClient.clear()
     setState({ status: 'signed_out' })
   }, [queryClient])
@@ -25,7 +25,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (state.status !== 'loading') return
     api('/api/auth/me/', Me)
       .then((user) => setState({ status: 'signed_in', user }))
-      .catch(() => signOut())
+      .catch((error: unknown) => {
+        // Only a rejected session ends it; a network blip or 5xx keeps the refresh token for a retry.
+        if (error instanceof ApiError && error.status === 401) signOut()
+        else setState({ status: 'offline' })
+      })
   }, [state.status, signOut])
 
   const signIn = useCallback(async (username: string, password: string) => {
