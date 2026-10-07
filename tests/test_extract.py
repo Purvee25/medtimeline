@@ -107,3 +107,68 @@ def test_baseline_prefers_longest_label():
 
     (row,) = extract_baseline("LDL Cholesterol 120 mg/dL").results
     assert row.marker.value == "ldl"
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "Name - Rohan Patel",
+        "Pt Name Rohan Patel",
+        "DOB: 01/02/1980",
+        "D.O.B 01/02/1980",
+        "UHID - AB1234",
+        "MRN 55512",
+        "PATIENT ID 778899",
+        "Address - 12 MG Road, Pune",
+        "Ref. by Dr. Mehta",
+        "Mr. Rohan Patel 45Y/M",
+        "Rohan Patel 45 Yrs / M",
+        "Age: 45 Sex: M",
+        "Age/Sex: 45 Y / M",
+        "Gender : Female",
+        "Contact 9876543210",
+    ],
+)
+def test_redaction_drops_identifying_lines(line):
+    assert redact_identifiers(line).strip() == ""
+
+
+@pytest.mark.parametrize(
+    "line,secret",
+    [
+        ("Call +91 98765 43210 for queries", "98765"),
+        ("Report emailed to rohan.p@example.com", "rohan.p@example.com"),
+        ("1234 5678 9012", "1234 5678 9012"),
+    ],
+)
+def test_redaction_scrubs_unlabelled_identifier_values(line, secret):
+    assert secret not in redact_identifiers(line)
+
+
+@pytest.mark.parametrize(
+    "line",
+    [
+        "Hemoglobin 13.2 g/dL 12.0 - 17.0",
+        "Platelet Count 264 10^3/uL 150 - 450",
+        "Total Leucocyte Count ........ 6.6 10^3/uL (4.0 - 11.0)",
+        "LDL Cholesterol 118 mg/dL 50 - 130",
+        "Triglycerides 1.59 mmol/L",
+        "C-Reactive Protein 4.4 mg/L 0.0 - 5.0",
+    ],
+)
+def test_redaction_keeps_result_rows(line):
+    assert redact_identifiers(line) == line
+
+
+def test_redaction_salvages_collection_date_from_identifier_line():
+    out = redact_identifiers("Patient: Rohan Patel   Sample collected: 2025-12-24   Report ID: rpt_001")
+    assert out == "Sample collected: 2025-12-24"
+
+
+def test_pdf_page_limit(tmp_path, monkeypatch):
+    from medtimeline_extract import text as text_module
+
+    generate_report("r1", "table_classic", random.Random(1), tmp_path)
+    monkeypatch.setattr(text_module, "MAX_PDF_PAGES", 0)
+    with pytest.raises(ValueError, match="pages"):
+        extract_text(tmp_path / "r1.pdf")
