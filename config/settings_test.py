@@ -9,3 +9,5 @@ from .settings import *
 CELERY_TASK_ALWAYS_EAGER = True
 CELERY_TASK_EAGER_PROPAGATES = True
 REST_FRAMEWORK = {**REST_FRAMEWORK, "DEFAULT_THROTTLE_CLASSES": []}
+# The test client speaks plain HTTP; production redirects to HTTPS.
+SECURE_SSL_REDIRECT = False
