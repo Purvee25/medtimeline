@@ -19,9 +19,17 @@ def _client():
     return boto3.client("s3", region_name=settings.AWS_REGION)
 
 
+@cache
+def _presign_client():
+    """Client used only to sign URLs the browser will call; differs from _client() in local Docker."""
+    if not settings.S3_PUBLIC_ENDPOINT_URL:
+        return _client()
+    return boto3.client("s3", region_name=settings.AWS_REGION, endpoint_url=settings.S3_PUBLIC_ENDPOINT_URL)
+
+
 def presigned_upload(key: str) -> dict:
     """Pre-signed POST that only accepts a PDF up to MAX_REPORT_BYTES at exactly `key`."""
-    return _client().generate_presigned_post(
+    return _presign_client().generate_presigned_post(
         Bucket=settings.REPORTS_BUCKET,
         Key=key,
         Fields={"Content-Type": PDF_CONTENT_TYPE},
@@ -34,7 +42,7 @@ def presigned_upload(key: str) -> dict:
 
 
 def presigned_download(key: str) -> str:
-    return _client().generate_presigned_url(
+    return _presign_client().generate_presigned_url(
         "get_object",
         Params={"Bucket": settings.REPORTS_BUCKET, "Key": key},
         ExpiresIn=settings.PRESIGNED_URL_TTL_SECONDS,
