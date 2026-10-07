@@ -1,10 +1,55 @@
 # MedTimeline
 
+**Lab-report PDFs in, one verified LOINC-coded health timeline out.**
+
+[![CI](https://github.com/Purvee25/medtimeline/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Purvee25/medtimeline/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Python 3.13](https://img.shields.io/badge/python-3.13-3776AB?logo=python&logoColor=white)
+![Django 6.1](https://img.shields.io/badge/django-6.1-092E20?logo=django&logoColor=white)
+![React 19](https://img.shields.io/badge/react-19-61DAFB?logo=react&logoColor=black)
+![TypeScript strict](https://img.shields.io/badge/typescript-strict-3178C6?logo=typescript&logoColor=white)
+
 Turns diagnostic lab-report PDFs from different centers into one verified, LOINC-coded health timeline.
 
 Patients and diagnostic-center staff upload reports. A background worker extracts the results with OCR and Claude, validates every value, and stores the clean ones. Anything suspicious waits for a human to review. Patients then see each marker as a trend across labs, and can export their whole record as FHIR.
 
-> **Scope:** portfolio and learning project. It doesn't diagnose or give dosing advice, and it's not clinically validated. All data in this repo is synthetic.
+> [!WARNING]
+> **Scope: not a medical device.** Portfolio and learning project. It doesn't diagnose or give dosing advice, and it's not clinically validated. All data in this repo is synthetic; never upload real patient data.
+
+## Contents
+
+- [Highlights](#highlights)
+- [Screenshots](#screenshots)
+- [Quickstart (Docker)](#quickstart-docker)
+- [Frontend](#frontend)
+- [Quickstart (local)](#quickstart-local)
+- [Architecture](#architecture)
+- [API](#api)
+- [Measured results](#measured-results)
+- [Privacy, safety and security](#privacy-safety-and-security)
+- [Standards](#standards)
+- [Operations](#operations)
+- [Project status / roadmap](#project-status--roadmap)
+- [Contributing](#contributing)
+- [Security](#security)
+- [License](#license)
+
+## Highlights
+
+- **End-to-end pipeline:** direct-to-S3 upload, Celery worker, PDF text layer or Tesseract OCR, redaction, then Claude structured output validated against unit and plausibility rules.
+- **Human in the loop:** only clean rows become observations; suspicious values wait for review.
+- **Measured, not claimed:** trend query **14.86 ms → 0.03 ms** on 100k observations; rule-based extraction F1 **0.960** on a held-out set.
+- **Standards:** LOINC-coded markers, canonical units, FHIR R4 `$everything` export.
+- **Privacy by design:** per-purpose consent, object-scoped access (404 across patients and centers), append-only audit log, erasure.
+- **Tested and typed:** 54 backend tests, run against Postgres in CI; React 19 + strict TypeScript with zod-validated API responses.
+
+## Screenshots
+
+| Trends (dark) | Reports (dark) |
+|---|---|
+| ![Trend chart for one marker across labs, with verified and awaiting-review points and an approximate reference band](docs/screenshots/trends-dark.png) | ![Reports list with drag-and-drop upload and live processing status](docs/screenshots/reports-dark.png) |
+| **Review (dark)** | **Trends on mobile (light)** |
+| ![Report detail showing values held back by validation and the review form](docs/screenshots/review-dark.png) | ![Trend chart on a phone-width screen in the light theme](docs/screenshots/trends-mobile-light.png) |
 
 ## Quickstart (Docker)
 
@@ -31,7 +76,6 @@ cd frontend && npm ci
 npm run dev        # http://localhost:5173, proxies /api to Django on :8000
 npm test           # Vitest + Testing Library
 ```
-```
 
 ## Quickstart (local)
 
@@ -46,20 +90,19 @@ createdb medtimeline && .venv/bin/python manage.py migrate --settings=config.set
 
 ## Architecture
 
-```
-client ──JWT──▶ Django REST API ──pre-signed POST──▶ client uploads PDF directly to S3
-                   │  /complete: verify size + %PDF- magic bytes
-                   ▼
-             Celery (Redis) ── row-locked claim ──▶ PDF text layer │ OCR (pdftoppm + Tesseract)
-                                                   ▼
-                                     redact identifiers ──▶ Claude (structured JSON output)
-                                                   ▼
-                       unit normalisation + plausibility checks (medtimeline_eval/markers.py)
-                         │ clean rows                          │ suspicious rows / no date
-                         ▼                                     ▼
-              Observation (LOINC, canonical unit)      needs_review ──▶ POST /review (human)
-                         ▼
-             GET /api/trends  ·  GET /api/fhir/Patient/$everything
+```mermaid
+flowchart TD
+    client["Client"] -- JWT --> api["Django REST API"]
+    api -- "pre-signed POST" --> s3[("S3: client uploads PDF directly")]
+    api -- "/complete: verify size + %PDF- magic bytes" --> celery["Celery (Redis): row-locked claim"]
+    celery --> text["PDF text layer | OCR (pdftoppm + Tesseract)"]
+    text --> redact["Redact identifiers"]
+    redact --> claude["Claude (structured JSON output)"]
+    claude --> validate["Unit normalisation + plausibility checks (medtimeline_eval/markers.py)"]
+    validate -- "clean rows" --> obs[("Observation (LOINC, canonical unit)")]
+    validate -- "suspicious rows / no date" --> review["needs_review"]
+    review -- "POST /review (human)" --> obs
+    obs --> out["GET /api/trends · GET /api/fhir/Patient/$everything"]
 ```
 
 | Package | Responsibility |
@@ -143,10 +186,24 @@ python -m medtimeline_eval.evaluate --truth data/synthetic --pred data/predictio
 - **CI** (`.github/workflows/ci.yml`): ruff, black, a check for missing migrations, and the full test suite against Postgres with Tesseract installed. For the frontend: lint, typecheck, Vitest and a production build.
 - **Cost:** Tesseract OCR is free. Each Claude call sends about 1–2k tokens of report text, so the 40-report evaluation costs well under $1. Set an AWS budget alert before deploying.
 
-## Not done yet
+## Project status / roadmap
 
-- AWS deployment (RDS, S3, ECS or EC2) and a live demo link
-- Extraction accuracy numbers (run the commands above with an API key)
-- Appointment booking, webhooks, medication log
+Runs end to end locally and in Docker Compose. Not done yet:
+
+- [ ] AWS deployment (RDS, S3, ECS or EC2) and a live demo link
+- [ ] Extraction accuracy numbers (run the commands above with an API key)
+- [ ] Appointment booking, webhooks, medication log
 
 Design trade-offs are recorded in [DECISIONS.md](DECISIONS.md).
+
+## Contributing
+
+Setup, checks and PR conventions are in [CONTRIBUTING.md](CONTRIBUTING.md). The CI jobs `test` and `frontend` must pass.
+
+## Security
+
+Report vulnerabilities privately; see [SECURITY.md](SECURITY.md). Never include real patient data in issues or PRs.
+
+## License
+
+[MIT](LICENSE) © 2026 Purvee25
