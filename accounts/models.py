@@ -1,5 +1,11 @@
+import secrets
+from datetime import timedelta
+
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.utils import timezone
+
+EMAIL_VERIFY_EXPIRY_HOURS = 24
 
 
 class Center(models.Model):
@@ -20,6 +26,11 @@ class User(AbstractUser):
 
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.PATIENT)
     center = models.ForeignKey(Center, null=True, blank=True, on_delete=models.PROTECT, related_name="staff")
+    # Email is required and unique so patients can log in with it.
+    email = models.EmailField(unique=True)
+    email_verified = models.BooleanField(default=False)
+
+    REQUIRED_FIELDS = ["email"]
 
     class Meta:
         constraints = [
@@ -55,3 +66,14 @@ class Consent(models.Model):
 
     class Meta:
         indexes = [models.Index(fields=["user", "purpose"])]
+
+
+class EmailVerificationToken(models.Model):
+    """Single-use token e-mailed to a patient on registration to verify their address."""
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="email_verification")
+    token = models.CharField(max_length=64, unique=True, default=secrets.token_urlsafe)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def is_valid(self) -> bool:
+        return timezone.now() < self.created_at + timedelta(hours=EMAIL_VERIFY_EXPIRY_HOURS)

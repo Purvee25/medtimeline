@@ -563,3 +563,112 @@ tr:last-child td {
     overflow-x: auto;
   }
 }
+
+/* ---- MarkerTabs: category bar + chip bar (EVE-style) ---- */
+
+.marker-tabs-wrap {
+  display: grid;
+  gap: 0;
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+/* Top row: category tabs */
+.marker-cat-bar {
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--line);
+  padding: 0 8px;
+}
+
+.marker-cat-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.marker-cat-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 18px 10px;
+  min-width: 80px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ink-secondary);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.12s, border-color 0.12s;
+  min-height: unset;
+}
+
+.marker-cat-tab:hover {
+  background: var(--surface-sunken);
+  color: var(--ink);
+}
+
+.marker-cat-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 650;
+  background: transparent;
+}
+
+.cat-icon {
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+/* Bottom row: marker chips */
+.marker-chip-bar {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 10px 16px;
+  flex-wrap: wrap;
+}
+
+.marker-chip-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.marker-chip {
+  padding: 5px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink-secondary);
+  font-size: 0.825rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  min-height: unset;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+
+.marker-chip:hover {
+  background: var(--surface-sunken);
+  color: var(--ink);
+}
+
+.marker-chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-weight: 650;
+}
+
+@media (prefers-color-scheme: dark) {
+  .marker-chip.active {
+    color: #fff;
+  }
+}

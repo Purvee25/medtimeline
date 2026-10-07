@@ -3,11 +3,12 @@ import uuid
 
 from django.db import transaction
 from django.db.models import QuerySet
-from rest_framework import mixins, status, viewsets
+from rest_framework import mixins, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from accounts.models import Consent, User
 
@@ -140,3 +141,43 @@ class ReportViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.G
             return Response({"detail": "No file available."}, status=status.HTTP_409_CONFLICT)
         _log(request, AccessLog.Action.DOWNLOAD, report)
         return Response({"url": storage.presigned_download(report.s3_key)})
+
+    @action(detail=True, methods=["post"])
+    def share(self, request: Request, pk: str | None = None) -> Response:
+        """Create a 72-hour read-only share token for this report (patient only)."""
+        report = self.get_object()
+        if not request.user.is_patient or report.patient_id != request.user.pk:
+            raise PermissionDenied("Only the patient who owns this report can share it.")
+        token = ReportShareToken.objects.create(report=report)
+        from django.conf import settings
+
+        share_url = f"{settings.FRONTEND_URL}/shared/{token.token}"
+        _log(request, AccessLog.Action.DOWNLOAD, report)  # reuse DOWNLOAD action for audit
+        return Response({"url": share_url, "expires_at": token.expires_at})
+
+
+class SharedReportView(APIView):
+    """Public read-only view of a report via share token (no auth required)."""
+
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request: Request, token: str) -> Response:
+        try:
+            token_obj = ReportShareToken.objects.select_related("report", "report__patient", "report__center").get(
+                token=token
+            )
+        except ReportShareToken.DoesNotExist:
+            return Response({"detail": "Invalid or expired share link."}, status=status.HTTP_404_NOT_FOUND)
+        if not token_obj.is_valid():
+            token_obj.delete()
+            return Response({"detail": "This share link has expired."}, status=status.HTTP_410_GONE)
+        report = token_obj.report
+        return Response(
+            {
+                "report": ReportSerializer(report).data,
+                "observations": ObservationSerializer(
+                    report.observations.filter(verified=True).order_by("marker_code"), many=True
+                ).data,
+                "expires_at": token_obj.expires_at,
+            }
+        )

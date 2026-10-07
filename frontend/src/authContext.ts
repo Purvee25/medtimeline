@@ -1,5 +1,7 @@
 import { createContext, useContext } from 'react'
-import type { Me } from './api/schemas'
+import type { Me, Registration } from './api/schemas'
+
+export type { Registration }
 
 export type AuthState =
   | { status: 'loading' }
@@ -7,17 +9,9 @@ export type AuthState =
   | { status: 'offline' }
   | { status: 'signed_in'; user: Me }
 
-export type Registration = {
-  username: string
-  email: string
-  password: string
-  consent_store_reports: boolean
-  consent_llm_extraction: boolean
-}
-
 export type AuthContextValue = {
   state: AuthState
-  signIn: (username: string, password: string) => Promise<void>
+  signIn: (email: string, password: string) => Promise<void>
   register: (form: Registration) => Promise<void>
   signOut: () => void
 }

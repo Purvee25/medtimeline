@@ -6,7 +6,12 @@ PASSWORD = "correct-horse-battery-9"
 
 
 def _patient(username: str, consent: bool = True, llm_consent: bool = False) -> User:
-    user = User.objects.create_user(username=username, password=PASSWORD)
+    user = User.objects.create_user(
+        username=username,
+        password=PASSWORD,
+        email=f"{username}@test.example",
+        email_verified=True,
+    )
     if consent:
         Consent.objects.create(user=user, purpose=Consent.Purpose.STORE_REPORTS, policy_version="test")
     if llm_consent:
@@ -15,7 +20,14 @@ def _patient(username: str, consent: bool = True, llm_consent: bool = False) -> 
 
 
 def _staff(username: str, center: Center) -> User:
-    return User.objects.create_user(username=username, password=PASSWORD, role=User.Role.CENTER_STAFF, center=center)
+    return User.objects.create_user(
+        username=username,
+        password=PASSWORD,
+        email=f"{username}@staff.example",
+        email_verified=True,
+        role=User.Role.CENTER_STAFF,
+        center=center,
+    )
 
 
 def _as(user: User) -> APIClient:
