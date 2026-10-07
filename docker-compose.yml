@@ -1,4 +1,4 @@
-# Local stack: API, Celery worker, Postgres, Redis and an S3-compatible mock (moto server).
+# Local stack: web UI (:3000), API (:8000), Celery worker, Postgres, Redis and an S3 mock (moto server).
 # Usage: cp .env.example .env && docker compose up --build
 x-app: &app
   build: .
@@ -9,6 +9,8 @@ x-app: &app
     AWS_ENDPOINT_URL: http://s3:5000
     AWS_ACCESS_KEY_ID: local
     AWS_SECRET_ACCESS_KEY: local
+    # Pre-signed URLs are opened by the browser, which can't resolve the internal "s3" hostname.
+    S3_PUBLIC_ENDPOINT_URL: http://localhost:5000
     DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,web
   depends_on:
     db: { condition: service_healthy }
@@ -16,6 +18,11 @@ x-app: &app
     s3-init: { condition: service_completed_successfully }
 
 services:
+  frontend:
+    build: ./frontend
+    ports: ["3000:80"]
+    depends_on: [web]
+
   web:
     <<: *app
     command: sh -c "python manage.py migrate --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 3"
@@ -62,7 +69,11 @@ services:
       python -c "import boto3, os;
       b = os.environ.get('REPORTS_BUCKET', 'medtimeline-reports-dev');
       r = os.environ.get('AWS_REGION', 'ap-south-1');
-      boto3.client('s3', region_name=r).create_bucket(Bucket=b, CreateBucketConfiguration={'LocationConstraint': r})"
+      s3 = boto3.client('s3', region_name=r);
+      s3.create_bucket(Bucket=b, CreateBucketConfiguration={'LocationConstraint': r});
+      s3.put_bucket_cors(Bucket=b, CORSConfiguration={'CORSRules': [{
+        'AllowedOrigins': ['http://localhost:3000', 'http://localhost:5173'],
+        'AllowedMethods': ['GET', 'POST'], 'AllowedHeaders': ['*'], 'MaxAgeSeconds': 3000}]})"
     restart: on-failure
 
 volumes:
