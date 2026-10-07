@@ -16,8 +16,18 @@ export const Me = z.object({
   email: z.string(),
   role: Role,
   center: z.number().nullable(),
+  email_verified: z.boolean().default(false),
 })
 export type Me = z.infer<typeof Me>
+
+export const Registration = z.object({
+  username: z.string(),
+  email: z.string().email(),
+  password: z.string(),
+  consent_store_reports: z.boolean(),
+  consent_llm_extraction: z.boolean(),
+})
+export type Registration = z.infer<typeof Registration>
 
 export const ReportStatus = z.enum([
   'awaiting_upload',

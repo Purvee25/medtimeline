@@ -15,14 +15,21 @@ pytestmark = pytest.mark.django_db
 def test_register_records_consent_and_jwt_login_works():
     response = APIClient().post(
         "/api/auth/register/",
-        {"username": "asha", "password": PASSWORD, "consent_store_reports": True, "consent_llm_extraction": False},
+        {
+            "username": "asha",
+            "email": "asha@test.example",
+            "password": PASSWORD,
+            "consent_store_reports": True,
+            "consent_llm_extraction": False,
+        },
     )
     assert response.status_code == 201
     user = User.objects.get(username="asha")
     assert user.role == User.Role.PATIENT
     assert list(user.consents.values_list("purpose", flat=True)) == [Consent.Purpose.STORE_REPORTS]
 
-    token = APIClient().post("/api/auth/token/", {"username": "asha", "password": PASSWORD}).data["access"]
+    # Login now uses email, not username.
+    token = APIClient().post("/api/auth/token/", {"email": "asha@test.example", "password": PASSWORD}).data["access"]
     client = APIClient()
     client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
     assert client.get("/api/auth/me/").data["role"] == "patient"

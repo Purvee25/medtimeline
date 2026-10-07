@@ -86,3 +86,29 @@ class AccessLog(models.Model):
 
     class Meta:
         indexes = [models.Index(fields=["patient", "-at"])]
+
+
+import secrets as _secrets
+
+
+SHARE_TOKEN_EXPIRY_HOURS = 72
+
+
+class ReportShareToken(models.Model):
+    """Time-limited read-only token so a patient can share a report with their doctor."""
+
+    report = models.ForeignKey(Report, on_delete=models.CASCADE, related_name="share_tokens")
+    token = models.CharField(max_length=64, unique=True, default=_secrets.token_urlsafe)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    def save(self, *args, **kwargs):
+        if not self.pk and not self.expires_at:
+            from django.utils import timezone
+            from datetime import timedelta
+            self.expires_at = timezone.now() + timedelta(hours=SHARE_TOKEN_EXPIRY_HOURS)
+        super().save(*args, **kwargs)
+
+    def is_valid(self) -> bool:
+        from django.utils import timezone
+        return timezone.now() < self.expires_at

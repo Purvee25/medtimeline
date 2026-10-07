@@ -1,27 +1,16 @@
 import type { Marker } from '../api/schemas'
 
-/** Category definitions: label, icon (SVG path / emoji), and which marker codes belong. */
+/** Category definitions: label, emoji icon, and which marker codes belong. */
 const CATEGORIES: { label: string; icon: string; codes: string[] }[] = [
-  {
-    label: 'All Tests',
-    icon: '🔬',
-    codes: [], // empty = show all
-  },
-  {
-    label: 'Blood Count',
-    icon: '🩸',
-    codes: ['hb', 'wbc', 'rbc', 'plt'],
-  },
-  {
-    label: 'Lipid Profile',
-    icon: '🫀',
-    codes: ['chol', 'hdl', 'ldl', 'tg'],
-  },
-  {
-    label: 'Inflammation',
-    icon: '🌡️',
-    codes: ['crp'],
-  },
+  { label: 'All Tests',      icon: '🔬', codes: [] },
+  { label: 'Blood Count',    icon: '🩸', codes: ['hb', 'wbc', 'rbc', 'plt'] },
+  { label: 'Lipid Profile',  icon: '🫀', codes: ['chol', 'hdl', 'ldl', 'tg'] },
+  { label: 'Liver Function', icon: '🟡', codes: ['alt', 'ast', 'alp', 'tbili'] },
+  { label: 'Kidney',         icon: '🫘', codes: ['creat', 'bun', 'uric'] },
+  { label: 'Thyroid',        icon: '🦋', codes: ['tsh', 't4'] },
+  { label: 'Diabetes',       icon: '📊', codes: ['glu', 'pp_glu', 'hba1c'] },
+  { label: 'Vitamins',       icon: '☀️', codes: ['ferritin', 'vitd', 'vitb12'] },
+  { label: 'Inflammation',   icon: '🌡️', codes: ['crp'] },
 ]
 
 interface MarkerTabsProps {

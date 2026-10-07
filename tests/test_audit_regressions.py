@@ -121,7 +121,7 @@ def test_download_unavailable_before_upload():
 def test_refresh_rotates_and_logout_revokes():
     _patient("alice")
     client = APIClient()
-    tokens = client.post("/api/auth/token/", {"username": "alice", "password": PASSWORD}).data
+    tokens = client.post("/api/auth/token/", {"email": "alice@test.example", "password": PASSWORD}).data
     rotated = client.post("/api/auth/token/refresh/", {"refresh": tokens["refresh"]})
     assert rotated.status_code == 200 and rotated.data["refresh"] != tokens["refresh"]
     # The old refresh token is revoked by rotation; the new one by logout.
