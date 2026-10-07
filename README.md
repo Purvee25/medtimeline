@@ -10,8 +10,27 @@ Patients and diagnostic-center staff upload reports. A background worker extract
 
 ```bash
 cp .env.example .env          # add ANTHROPIC_API_KEY to enable Claude extraction
-docker compose up --build     # API on :8000, Celery worker, Postgres, Redis, local S3
-curl localhost:8000/healthz
+docker compose up --build     # web UI on :3000, API on :8000, worker, Postgres, Redis, local S3
+docker compose exec -e DJANGO_DEBUG=1 web python manage.py seed_demo   # demo accounts + a year of results
+```
+
+Open http://localhost:3000 and sign in as `demo_patient` or `demo_staff`. The local-only password is `DEMO_PASSWORD` in `reports/management/commands/seed_demo.py`.
+
+## Frontend
+
+React 19 and TypeScript (strict mode), built with Vite, in `frontend/`.
+
+- React Query handles fetching, caching, and polling while a report is processing.
+- Every API response is validated with zod, and React Router handles navigation.
+- Screens: sign in and register (with consent), reports (drag-and-drop upload straight to S3, live status), report detail (values held back by validation, and a review form), trends, and account (consents, FHIR export, account deletion).
+- The trend chart is a hand-built SVG: a single series in one colour checked for colour-blind safety; filled points for verified values and hollow points for ones awaiting review; a shaded approximate reference band; a crosshair tooltip that also works with the arrow keys; and a data table view. It is laid out at the container's real pixel width, so labels stay readable on phones.
+- Light and dark themes follow the system setting.
+
+```bash
+cd frontend && npm ci
+npm run dev        # http://localhost:5173, proxies /api to Django on :8000
+npm test           # Vitest + Testing Library
+```
 ```
 
 ## Quickstart (local)
@@ -49,6 +68,7 @@ client ──JWT──▶ Django REST API ──pre-signed POST──▶ client 
 | `reports/` | Upload flow, extraction task, review, trends, FHIR mapping, audit log |
 | `medtimeline_extract/` | PDF → text → redaction → Claude → validated rows (usable without Django) |
 | `medtimeline_eval/` | Marker catalogue (LOINC, units, ranges), synthetic report generator, evaluator |
+| `frontend/` | React + TypeScript web app: upload, review, trends, account |
 
 ## API
 
@@ -65,6 +85,7 @@ client ──JWT──▶ Django REST API ──pre-signed POST──▶ client 
 | `POST /api/reports/{id}/review/` | Replace values with human-verified ones |
 | `GET /api/trends/?marker=crp[&patient=…][&verified_only=true]` | One marker over time, all centers, canonical units |
 | `GET /api/fhir/Patient/$everything` | Patient's own record as a FHIR R4 Bundle |
+| `GET /api/markers/` | Marker catalogue (codes, LOINC, units) for clients |
 | `GET /healthz` | Liveness and database check |
 
 ## Measured results
@@ -119,13 +140,13 @@ python -m medtimeline_eval.evaluate --truth data/synthetic --pred data/predictio
 - **Docker image:** multi-stage build, runs as a non-root user, with `HEALTHCHECK`. Compose adds health-gated Postgres, Redis and a moto S3 server.
 - **Worker:** acks late, prefetch 1, hard time limit. Transient Claude and S3 errors retry 3× with exponential backoff, then the report is marked `failed` with the reason.
 - **Logging:** structured; request IDs and token usage are logged for each Claude call, report contents never are.
-- **CI** (`.github/workflows/ci.yml`): ruff, black, a check for missing migrations, and the full test suite against Postgres with Tesseract installed.
+- **CI** (`.github/workflows/ci.yml`): ruff, black, a check for missing migrations, and the full test suite against Postgres with Tesseract installed. For the frontend: lint, typecheck, Vitest and a production build.
 - **Cost:** Tesseract OCR is free. Each Claude call sends about 1–2k tokens of report text, so the 40-report evaluation costs well under $1. Set an AWS budget alert before deploying.
 
 ## Not done yet
 
 - AWS deployment (RDS, S3, ECS or EC2) and a live demo link
 - Extraction accuracy numbers (run the commands above with an API key)
-- React dashboard, appointment booking, webhooks, medication log
+- Appointment booking, webhooks, medication log
 
 Design trade-offs are recorded in [DECISIONS.md](DECISIONS.md).

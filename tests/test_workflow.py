@@ -256,3 +256,25 @@ def test_erasure_deletes_account_reports_and_files(s3, tmp_path):
 
 def test_staff_cannot_self_erase():
     assert _as(_staff("s", Center.objects.create(name="A"))).delete("/api/auth/me/").status_code == 403
+
+
+def test_marker_catalogue_endpoint():
+    data = _as(_patient("alice")).get("/api/markers/").data
+    chol = next(m for m in data if m["code"] == "chol")
+    assert chol == {
+        "code": "chol",
+        "name": "Total Cholesterol",
+        "loinc": "2093-3",
+        "unit": "mg/dL",
+        "units": ["mg/dL", "mmol/L"],
+    }
+
+
+def test_presigned_urls_use_public_endpoint_when_configured(settings):
+    from reports import storage
+
+    settings.S3_PUBLIC_ENDPOINT_URL = "http://localhost:5000"
+    storage._presign_client.cache_clear()
+    upload = _create_report(_patient("alice"))["upload"]
+    assert upload["url"].startswith("http://localhost:5000/")
+    storage._presign_client.cache_clear()

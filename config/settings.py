@@ -102,6 +102,9 @@ SIMPLE_JWT = {
 # Report storage (private S3 bucket; clients upload/download via short-lived pre-signed URLs)
 AWS_REGION = os.environ.get("AWS_REGION", "ap-south-1")
 REPORTS_BUCKET = os.environ.get("REPORTS_BUCKET", "medtimeline-reports-dev")
+# Endpoint the *browser* uses for pre-signed URLs. Unset on AWS; set locally when the server reaches
+# S3 under an internal hostname (e.g. http://s3:5000 in docker compose) the browser cannot resolve.
+S3_PUBLIC_ENDPOINT_URL = os.environ.get("S3_PUBLIC_ENDPOINT_URL") or None
 PRESIGNED_URL_TTL_SECONDS = int(os.environ.get("PRESIGNED_URL_TTL_SECONDS", "300"))
 MAX_REPORT_BYTES = int(os.environ.get("MAX_REPORT_BYTES", str(10 * 1024 * 1024)))
 
@@ -115,6 +118,8 @@ LOGGING = {
 
 # Background jobs
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
+# Local development without Redis: run tasks inline in the request. Never enable in production.
+CELERY_TASK_ALWAYS_EAGER = _env_bool("CELERY_TASK_ALWAYS_EAGER")
 CELERY_TASK_ACKS_LATE = True
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 CELERY_TASK_TIME_LIMIT = int(os.environ.get("CELERY_TASK_TIME_LIMIT", "300"))

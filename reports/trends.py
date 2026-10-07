@@ -72,6 +72,24 @@ class TrendView(APIView):
         )
 
 
+class MarkerListView(APIView):
+    """GET /api/markers/ — the marker catalogue, so clients never keep their own copy."""
+
+    def get(self, request: Request) -> Response:
+        return Response(
+            [
+                {
+                    "code": m.code,
+                    "name": m.name,
+                    "loinc": m.loinc,
+                    "unit": m.canonical_unit,
+                    "units": [m.canonical_unit, *m.alt_units],
+                }
+                for m in MARKERS.values()
+            ]
+        )
+
+
 class FhirExportView(APIView):
     """GET /api/fhir/Patient/$everything — the caller's own data as a FHIR R4 Bundle (data portability)."""
 

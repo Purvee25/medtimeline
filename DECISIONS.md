@@ -55,3 +55,14 @@ Each entry: what we chose, what we rejected, why.
 
 ## Local S3 runs on moto server, not MinIO
 - MinIO's public container images are no longer published on Docker Hub. Moto is already the test double, so local dev and tests use the same S3 behaviour.
+
+## Frontend keeps the access token in memory and the refresh token in sessionStorage
+- **Chosen:** the 15-minute access token lives only in a JavaScript variable. The 1-day refresh token is in sessionStorage, so a reload keeps you signed in, but closing the tab ends the session. A 401 triggers one refresh, shared across concurrent requests, then sign-out.
+- **Rejected:** localStorage, which keeps tokens across browser restarts and is readable by any XSS for longer. Also rejected: httpOnly refresh cookies, the stronger option, which would need CSRF handling on the refresh endpoint. That's the next step before a real deployment.
+
+## Frontend validates every API response with zod
+- The API is external input to the browser. A schema mismatch fails in one place with a clear error, instead of `undefined` showing up deep inside a component.
+
+## Same-origin API in dev and in Docker
+- Vite's dev proxy and nginx both serve `/api` from the page's own origin, so Django needs no CORS configuration.
+- Only S3 needs CORS, because the browser uploads directly to the pre-signed URL. In Docker, `S3_PUBLIC_ENDPOINT_URL` signs those URLs for a hostname the browser can reach.

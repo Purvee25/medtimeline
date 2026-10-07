@@ -12,6 +12,7 @@ def s3(monkeypatch):
     monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "testing")
     with mock_aws():
         storage._client.cache_clear()
+        storage._presign_client.cache_clear()
         client = boto3.client("s3", region_name=settings.AWS_REGION)
         client.create_bucket(
             Bucket=settings.REPORTS_BUCKET,
@@ -19,3 +20,4 @@ def s3(monkeypatch):
         )
         yield client
     storage._client.cache_clear()
+    storage._presign_client.cache_clear()
