@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-24.04
@@ -37,6 +40,11 @@ jobs:
           black --check --exclude '/(\.venv|migrations)/' .
       - name: Migrations are up to date
         run: python manage.py makemigrations --check --dry-run --settings=config.settings_test
+      - name: Deployment settings check
+        run: python manage.py check --deploy --fail-level WARNING
+        env:
+          DJANGO_SECRET_KEY: ci-only-${{ github.run_id }}-not-a-real-secret-key-but-long-enough
+          DJANGO_ALLOWED_HOSTS: example.com
       - name: Test
         run: pytest -q
 
