@@ -14,9 +14,14 @@ import {
 } from './schemas'
 import { uploadReport } from './upload'
 
-/** Statuses the worker hasn't finished with; their views poll until they settle. */
-const IN_FLIGHT: ReadonlySet<ReportStatus> = new Set(['awaiting_upload', 'uploaded', 'processing'])
+/**
+ * Statuses the worker hasn't finished with; their views poll until they settle. `awaiting_upload`
+ * is excluded: if the browser never finished the S3 upload, nothing will ever move it on.
+ */
+const IN_FLIGHT: ReadonlySet<ReportStatus> = new Set(['uploaded', 'processing'])
 const POLL_MS = 3000
+// Some browsers start a download asynchronously; revoking the blob URL immediately can cancel it.
+const BLOB_URL_LIFETIME_MS = 60_000
 
 export const keys = {
   reports: ['reports'] as const,
@@ -110,7 +115,7 @@ export async function downloadFhirBundle(): Promise<void> {
   const url = URL.createObjectURL(blob)
   const link = Object.assign(document.createElement('a'), { href: url, download: 'medtimeline-fhir.json' })
   link.click()
-  URL.revokeObjectURL(url)
+  setTimeout(() => URL.revokeObjectURL(url), BLOB_URL_LIFETIME_MS)
 }
 
 export async function eraseAccount(): Promise<void> {

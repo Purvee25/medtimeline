@@ -46,10 +46,20 @@ export function Trends() {
             </select>
           </label>
           {isStaff && (
-            <label>
-              Patient username
-              <input defaultValue={patient} onBlur={(e) => set('patient', e.target.value.trim())} />
-            </label>
+            <form
+              className="row"
+              style={{ alignItems: 'end' }}
+              onSubmit={(e) => {
+                e.preventDefault()
+                set('patient', String(new FormData(e.currentTarget).get('patient') ?? '').trim())
+              }}
+            >
+              <label>
+                Patient username
+                <input key={patient} name="patient" defaultValue={patient} autoComplete="off" />
+              </label>
+              <button type="submit">Show</button>
+            </form>
           )}
           <label className="check" style={{ paddingBottom: 9 }}>
             <input

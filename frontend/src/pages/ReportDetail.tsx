@@ -214,9 +214,13 @@ export function ReportDetail() {
           {downloadError}
         </p>
       )}
-      {meta.error && <p className="alert error">{meta.error}</p>}
+      {meta.error && (
+        <p className="alert error" role="alert">
+          {meta.error}
+        </p>
+      )}
       {extraction?.skipped === 'no_llm_consent' && (
-        <p className="alert info">
+        <p className="alert info" role="status">
           Automatic reading is off for this account, so values need to be entered below. You can turn it on in
           Account.
         </p>
@@ -283,7 +287,7 @@ export function ReportDetail() {
       )}
 
       {REVIEWABLE.has(meta.status) && (
-        <ReviewForm key={`${meta.status}-${observations.length}`} data={report.data} markers={markers.data} />
+        <ReviewForm key={meta.id} data={report.data} markers={markers.data} />
       )}
       {!REVIEWABLE.has(meta.status) && meta.status !== 'rejected' && (
         <p className="muted" role="status">

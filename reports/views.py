@@ -60,7 +60,7 @@ class ReportViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.G
         patient: User = serializer.validated_data["patient"]
         has_consent = patient.consents.filter(purpose=Consent.Purpose.STORE_REPORTS, withdrawn_at__isnull=True).exists()
         if not has_consent:
-            raise PermissionDenied("Patient has not consented to report storage.")
+            raise PermissionDenied("You have not consented to report storage.")
 
         report = Report.objects.create(
             patient=patient,
@@ -109,9 +109,14 @@ class ReportViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.G
         return Response(ObservationSerializer(report.observations.order_by("marker_code"), many=True).data)
 
     @action(detail=True, methods=["post"])
+    @transaction.atomic
     def complete(self, request: Request, pk: str | None = None) -> Response:
-        """Called after the S3 upload: verifies the object and marks the report uploaded."""
-        report = self.get_object()
+        """Called after the S3 upload: verifies the object and marks the report uploaded.
+
+        The row lock makes concurrent calls serialise: the second sees UPLOADED and gets 409,
+        so extraction is queued exactly once.
+        """
+        report = self.get_queryset().select_for_update(of=("self",)).get(pk=self.get_object().pk)
         if report.uploaded_by_id != request.user.pk:
             raise PermissionDenied("Only the uploader can complete this upload.")
         if report.status != Report.Status.AWAITING_UPLOAD:

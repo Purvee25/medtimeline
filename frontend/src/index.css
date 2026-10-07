@@ -10,6 +10,8 @@
   --line-strong: #c9c7be;
   --accent: #2a78d6;
   --accent-ink: #1d5fae;
+  /* Button fill: darker than the chart series colour so white text clears 4.5:1 (4.87:1). */
+  --accent-strong: #2571cc;
   --on-accent: #ffffff;
   --focus: #2a78d6;
   --band: rgba(137, 135, 129, 0.14);
@@ -40,6 +42,7 @@
     --line-strong: #44433f;
     --accent: #3987e5;
     --accent-ink: #79adf0;
+    --accent-strong: #3987e5;
     --on-accent: #0d1b2e;
     --focus: #79adf0;
     --band: rgba(137, 135, 129, 0.18);
@@ -281,8 +284,8 @@ button:disabled {
 }
 
 button.primary {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--accent-strong);
+  border-color: var(--accent-strong);
   color: var(--on-accent);
 }
 
@@ -443,7 +446,7 @@ tr:last-child td {
   color: var(--ink-secondary);
 }
 
-.tabs button[aria-selected='true'] {
+.tabs button[aria-pressed='true'] {
   background: var(--surface-raised);
   color: var(--ink);
   box-shadow: var(--shadow);

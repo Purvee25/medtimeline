@@ -107,7 +107,8 @@ def test_permanent_error_marks_failed(s3, tmp_path, fake_claude):
     report = _uploaded_report(s3, tmp_path, _patient("alice", llm_consent=True))
     assert extract_report(str(report.pk)) == Report.Status.FAILED
     report.refresh_from_db()
-    assert "bad output" in report.error
+    assert report.error == tasks.EXTRACTION_FAILED
+    assert "bad output" not in report.error
 
 
 def test_transient_error_retries_then_fails_on_last_attempt(s3, tmp_path, fake_claude):
@@ -121,7 +122,7 @@ def test_transient_error_retries_then_fails_on_last_attempt(s3, tmp_path, fake_c
 
     extract_report.apply(args=[str(report.pk)], retries=tasks.MAX_RETRIES)
     report.refresh_from_db()
-    assert report.status == Report.Status.FAILED and "after 3 retries" in report.error
+    assert report.status == Report.Status.FAILED and report.error == tasks.SERVICE_UNAVAILABLE
 
 
 # --- review ---------------------------------------------------------------

@@ -3,7 +3,7 @@ from rest_framework import generics, permissions, serializers, status
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from rest_framework_simplejwt.views import TokenBlacklistView, TokenObtainPairView, TokenRefreshView
 
 from reports.services import erase_patient
 
@@ -22,7 +22,13 @@ class ThrottledTokenObtainPairView(TokenObtainPairView):
 
 
 class ThrottledTokenRefreshView(TokenRefreshView):
-    throttle_scope = "auth"
+    throttle_scope = "refresh"
+
+
+class LogoutView(TokenBlacklistView):
+    """POST {"refresh": ...} revokes that refresh token. Access tokens expire within 15 minutes."""
+
+    throttle_scope = "refresh"
 
 
 class MeView(generics.RetrieveDestroyAPIView):

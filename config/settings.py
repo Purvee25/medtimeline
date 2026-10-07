@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
+    "rest_framework_simplejwt.token_blacklist",
     "accounts",
     "reports",
 ]
@@ -44,6 +45,8 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = "config.urls"
+# Keep the admin off its well-known path in deployments.
+ADMIN_PATH = os.environ.get("DJANGO_ADMIN_PATH", "admin/")
 WSGI_APPLICATION = "config.wsgi.application"
 TEMPLATES = [
     {
@@ -89,6 +92,9 @@ REST_FRAMEWORK = {
         "anon": os.environ.get("THROTTLE_ANON", "30/min"),
         "user": os.environ.get("THROTTLE_USER", "300/min"),
         "auth": os.environ.get("THROTTLE_AUTH", "10/min"),
+        # Refresh runs on every page load and token expiry; it gets its own, looser budget so a
+        # burst of sign-in attempts can't log out active users (and vice versa).
+        "refresh": os.environ.get("THROTTLE_REFRESH", "60/min"),
     },
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,
@@ -97,6 +103,10 @@ REST_FRAMEWORK = {
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+    # Each refresh returns a new refresh token and revokes the old one, so a stolen token stops
+    # working as soon as the real client refreshes; logout revokes it outright.
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
 }
 
 # Report storage (private S3 bucket; clients upload/download via short-lived pre-signed URLs)
@@ -123,3 +133,18 @@ CELERY_TASK_ALWAYS_EAGER = _env_bool("CELERY_TASK_ALWAYS_EAGER")
 CELERY_TASK_ACKS_LATE = True
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 CELERY_TASK_TIME_LIMIT = int(os.environ.get("CELERY_TASK_TIME_LIMIT", "300"))
+
+# Production transport security. TLS terminates at the load balancer / nginx, which sets
+# X-Forwarded-Proto; /healthz stays reachable over plain HTTP for container health checks.
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = _env_bool("SECURE_SSL_REDIRECT", True)
+    SECURE_REDIRECT_EXEMPT = [r"^healthz$"]
+    SECURE_HSTS_SECONDS = int(os.environ.get("SECURE_HSTS_SECONDS", str(60 * 60 * 24 * 365)))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    # Preload is effectively irreversible; opt in deliberately once the domain is final.
+    SECURE_HSTS_PRELOAD = False
+    SILENCED_SYSTEM_CHECKS = ["security.W021"]
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    CSRF_TRUSTED_ORIGINS = [o for o in os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",") if o]

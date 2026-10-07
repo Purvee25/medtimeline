@@ -1,5 +1,5 @@
 import type { z } from 'zod'
-import { AccessToken, Tokens } from './schemas'
+import { RefreshedTokens, Tokens } from './schemas'
 
 const REFRESH_KEY = 'medtimeline.refresh'
 
@@ -46,6 +46,21 @@ export const session = {
     accessToken = null
     writeRefresh(null)
   },
+  /** Revoke the refresh token server-side (best effort), then forget both tokens. */
+  async logout() {
+    const refresh = readRefresh()
+    session.clear()
+    if (!refresh) return
+    try {
+      await fetch('/api/auth/logout/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh }),
+      })
+    } catch {
+      // Offline: the token still expires on its own within a day.
+    }
+  },
   onSignedOut(callback: () => void) {
     onSignedOut = callback
   },
@@ -82,7 +97,8 @@ async function refreshAccess(): Promise<boolean> {
         body: JSON.stringify({ refresh }),
       })
       if (!response.ok) return false
-      accessToken = AccessToken.parse(await response.json()).access
+      // The server rotates refresh tokens: the old one is now revoked, so store the new pair.
+      session.setTokens(RefreshedTokens.parse(await response.json()))
       return true
     } finally {
       refreshing = null

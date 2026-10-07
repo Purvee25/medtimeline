@@ -36,7 +36,15 @@ function UploadCard() {
       {needsPatient && (
         <label style={{ maxWidth: 320 }}>
           Patient username
-          <input value={patient} onChange={(e) => setPatient(e.target.value)} placeholder="e.g. asha" />
+          <input
+            value={patient}
+            onChange={(e) => setPatient(e.target.value)}
+            placeholder="e.g. asha"
+            aria-describedby="patient-hint"
+          />
+          <span id="patient-hint" className="small muted" style={{ fontWeight: 400 }}>
+            Required: the patient must have consented to report storage.
+          </span>
         </label>
       )}
       <div
@@ -56,6 +64,7 @@ function UploadCard() {
           type="button"
           className="primary"
           disabled={upload.isPending || blocked}
+          aria-describedby={needsPatient ? 'patient-hint' : undefined}
           onClick={() => input.current?.click()}
         >
           {upload.isPending ? 'Uploading…' : 'Choose file'}

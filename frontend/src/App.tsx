@@ -47,6 +47,21 @@ export function App() {
       </p>
     )
   }
+  if (state.status === 'offline') {
+    return (
+      <div className="auth">
+        <div className="card" role="alert">
+          <h1>Can't reach MedTimeline</h1>
+          <p className="muted">Check your connection. You're still signed in.</p>
+          <div>
+            <button type="button" className="primary" onClick={() => window.location.reload()}>
+              Try again
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
   if (state.status === 'signed_out') return <SignIn />
 
   return (

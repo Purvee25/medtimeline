@@ -13,7 +13,7 @@ describe('api', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string, init?: RequestInit) => {
-        if (url === '/api/auth/token/refresh/') return json({ access: 'new' })
+        if (url === '/api/auth/token/refresh/') return json({ access: 'new', refresh: 'r2' })
         const header = (init?.headers as Record<string, string> | undefined)?.Authorization
         auth.push(header)
         return header === 'Bearer new' ? json({ ok: true }) : json({ detail: 'expired' }, 401)
@@ -22,6 +22,7 @@ describe('api', () => {
 
     await expect(api('/api/thing/', z.object({ ok: z.boolean() }))).resolves.toEqual({ ok: true })
     expect(auth).toEqual(['Bearer old', 'Bearer new'])
+    expect(sessionStorage.getItem('medtimeline.refresh')).toBe('r2')
   })
 
   it('signs out when the refresh token is also rejected', async () => {
@@ -45,5 +46,36 @@ describe('api', () => {
     session.setTokens({ access: 'a', refresh: 'r' })
     vi.stubGlobal('fetch', vi.fn(async () => json({ count: 'many' })))
     await expect(api('/api/x/', z.object({ count: z.number() }))).rejects.toBeInstanceOf(z.ZodError)
+  })
+})
+
+describe('session.logout', () => {
+  it('revokes the refresh token on the server and forgets it locally', async () => {
+    session.setTokens({ access: 'a', refresh: 'r' })
+    const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    await session.logout()
+    expect(fetchMock).toHaveBeenCalledWith('/api/auth/logout/', expect.objectContaining({ body: '{"refresh":"r"}' }))
+    expect(session.hasRefreshToken()).toBe(false)
+  })
+})
+
+describe('single-flight refresh', () => {
+  it('shares one refresh between concurrent 401s', async () => {
+    session.setTokens({ access: 'old', refresh: 'r' })
+    let refreshes = 0
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (url === '/api/auth/token/refresh/') {
+          refreshes += 1
+          return json({ access: 'new', refresh: 'r2' })
+        }
+        const header = (init?.headers as Record<string, string> | undefined)?.Authorization
+        return header === 'Bearer new' ? json({}) : json({}, 401)
+      }),
+    )
+    await Promise.all([api('/a/', z.object({})), api('/b/', z.object({})), api('/c/', z.object({}))])
+    expect(refreshes).toBe(1)
   })
 })

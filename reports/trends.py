@@ -16,6 +16,9 @@ from .models import AccessLog, Observation, Report
 def resolve_patient(request: Request, username: str | None) -> User:
     """Patients may only query themselves; staff may query patients with a report at their center.
 
+    Staff results are further limited to their own center's observations (see TrendView), so creating
+    a report for a patient never exposes what other centers or the patient themselves uploaded.
+
     Out-of-scope patients raise 404, matching the report endpoints.
     """
     user: User = request.user
@@ -45,6 +48,8 @@ class TrendView(APIView):
 
         marker = MARKERS[query.validated_data["marker"]]
         observations = Observation.objects.filter(patient=patient, loinc=marker.loinc)
+        if request.user.is_center_staff:
+            observations = observations.filter(report__center_id=request.user.center_id)
         if query.validated_data["verified_only"]:
             observations = observations.filter(verified=True)
         points = observations.order_by("effective_date").values(

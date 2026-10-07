@@ -7,7 +7,7 @@ import { z } from 'zod'
 const decimal = z.union([z.number(), z.string()]).transform(Number).pipe(z.number().finite())
 
 export const Tokens = z.object({ access: z.string(), refresh: z.string() })
-export const AccessToken = z.object({ access: z.string() })
+export const RefreshedTokens = z.object({ access: z.string(), refresh: z.string() })
 
 export const Role = z.enum(['patient', 'center_staff'])
 export const Me = z.object({
