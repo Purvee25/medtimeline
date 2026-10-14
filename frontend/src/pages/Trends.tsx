@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { useMarkers, useTrend } from '../api/queries'
 import { useUser } from '../authContext'
+import { MarkerTabs } from '../components/MarkerTabs'
 import { TrendChart } from '../components/TrendChart'
 import { errorText, formatDate } from '../format'
 
@@ -33,18 +34,15 @@ export function Trends() {
         </div>
       </div>
 
+      {/* Category + marker tabs — EVE-style horizontal scroll bar */}
+      <MarkerTabs
+        markers={markers.data}
+        selected={marker}
+        onSelect={(code) => set('marker', code)}
+      />
+
       <section className="card">
         <div className="row" style={{ alignItems: 'end' }}>
-          <label>
-            Test
-            <select value={marker} onChange={(e) => set('marker', e.target.value)} disabled={!markers.data}>
-              {markers.data?.map((m) => (
-                <option key={m.code} value={m.code}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
-          </label>
           {isStaff && (
             <form
               className="row"

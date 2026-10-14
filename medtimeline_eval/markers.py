@@ -38,6 +38,9 @@ class Marker:
 MG_DL_TO_MMOL_CHOL = 0.02586
 MG_DL_TO_MMOL_TG = 0.01129
 THOUSAND_PER_UL_TO_LAKH = 0.01
+MMOL_L_TO_MG_DL_GLUCOSE = 18.016
+UMOL_L_TO_MG_DL_CREAT = 0.01131
+UMOL_L_TO_MG_DL_URIC = 0.01681
 
 MARKERS: dict[str, Marker] = {
     m.code: m
@@ -118,12 +121,176 @@ MARKERS: dict[str, Marker] = {
             decimals=0,
         ),
         Marker("crp", "1988-5", "C-Reactive Protein", "mg/L", (0.0, 5.0), (0.0, 500.0), ("CRP", "CRP (Quantitative)")),
+        # Thyroid
+        Marker(
+            "tsh",
+            "3016-3",
+            "TSH",
+            "mIU/L",
+            (0.4, 4.0),
+            (0.001, 200.0),
+            ("Thyroid Stimulating Hormone", "S. TSH", "TSH (Ultrasensitive)"),
+            decimals=2,
+        ),
+        Marker(
+            "t4",
+            "3026-2",
+            "Free T4",
+            "ng/dL",
+            (0.8, 1.8),
+            (0.1, 10.0),
+            ("FT4", "Free Thyroxine", "T4 Free"),
+            decimals=2,
+        ),
+        # Liver function
+        Marker(
+            "alt",
+            "1742-6",
+            "ALT (SGPT)",
+            "U/L",
+            (7.0, 56.0),
+            (1.0, 3000.0),
+            ("SGPT", "Alanine Aminotransferase", "ALT/SGPT"),
+            decimals=0,
+        ),
+        Marker(
+            "ast",
+            "1920-8",
+            "AST (SGOT)",
+            "U/L",
+            (10.0, 40.0),
+            (1.0, 5000.0),
+            ("SGOT", "Aspartate Aminotransferase", "AST/SGOT"),
+            decimals=0,
+        ),
+        Marker(
+            "alp",
+            "6768-6",
+            "Alkaline Phosphatase",
+            "U/L",
+            (44.0, 147.0),
+            (10.0, 3000.0),
+            ("ALP", "Alk. Phosphatase"),
+            decimals=0,
+        ),
+        Marker(
+            "tbili",
+            "1975-2",
+            "Total Bilirubin",
+            "mg/dL",
+            (0.2, 1.2),
+            (0.0, 50.0),
+            ("T. Bilirubin", "Serum Bilirubin Total", "Bilirubin Total"),
+            decimals=1,
+        ),
+        # Kidney function
+        Marker(
+            "creat",
+            "2160-0",
+            "Creatinine",
+            "mg/dL",
+            (0.6, 1.2),
+            (0.1, 30.0),
+            ("S. Creatinine", "Serum Creatinine", "Creatinine (Serum)"),
+            {"umol/L": UMOL_L_TO_MG_DL_CREAT, "µmol/L": UMOL_L_TO_MG_DL_CREAT},
+            decimals=2,
+        ),
+        Marker(
+            "bun",
+            "3094-0",
+            "Blood Urea Nitrogen",
+            "mg/dL",
+            (7.0, 20.0),
+            (1.0, 200.0),
+            ("BUN", "Urea Nitrogen", "Blood Urea"),
+            decimals=0,
+        ),
+        Marker(
+            "uric",
+            "3084-1",
+            "Uric Acid",
+            "mg/dL",
+            (2.5, 7.0),
+            (0.5, 30.0),
+            ("S. Uric Acid", "Serum Uric Acid", "Uric Acid (Serum)"),
+            {"umol/L": UMOL_L_TO_MG_DL_URIC, "µmol/L": UMOL_L_TO_MG_DL_URIC},
+            decimals=1,
+        ),
+        # Glucose / diabetes
+        Marker(
+            "glu",
+            "2345-7",
+            "Fasting Blood Glucose",
+            "mg/dL",
+            (70.0, 100.0),
+            (20.0, 800.0),
+            ("FBS", "Fasting Blood Sugar", "Fasting Glucose", "Glucose (F)"),
+            {"mmol/L": 1 / MMOL_L_TO_MG_DL_GLUCOSE},
+            decimals=0,
+        ),
+        Marker(
+            "pp_glu",
+            "2339-0",
+            "Post-Prandial Glucose",
+            "mg/dL",
+            (70.0, 140.0),
+            (20.0, 800.0),
+            ("PPBS", "Post Prandial Blood Sugar", "PP Glucose", "Glucose (PP)"),
+            {"mmol/L": 1 / MMOL_L_TO_MG_DL_GLUCOSE},
+            decimals=0,
+        ),
+        Marker(
+            "hba1c",
+            "4548-4",
+            "HbA1c",
+            "%",
+            (4.0, 5.6),
+            (2.0, 20.0),
+            ("Glycated Haemoglobin", "Glycosylated Hb", "HbA1C", "A1C"),
+            decimals=1,
+        ),
+        # Iron studies
+        Marker(
+            "ferritin",
+            "2276-4",
+            "Ferritin",
+            "ng/mL",
+            (12.0, 300.0),
+            (1.0, 10000.0),
+            ("S. Ferritin", "Serum Ferritin"),
+            decimals=0,
+        ),
+        Marker(
+            "vitd",
+            "14635-7",
+            "Vitamin D (25-OH)",
+            "ng/mL",
+            (30.0, 100.0),
+            (1.0, 200.0),
+            ("25-OH Vitamin D", "Vit D", "Vitamin D Total", "25(OH)D"),
+            decimals=1,
+        ),
+        Marker(
+            "vitb12",
+            "2132-9",
+            "Vitamin B12",
+            "pg/mL",
+            (200.0, 900.0),
+            (50.0, 5000.0),
+            ("Cobalamin", "Vit B12", "Cyanocobalamin"),
+            decimals=0,
+        ),
     )
 }
 
 PANELS: dict[str, tuple[str, ...]] = {
     "CBC": ("hb", "wbc", "rbc", "plt"),
     "Lipid Profile": ("chol", "hdl", "ldl", "tg"),
+    "Liver Function": ("alt", "ast", "alp", "tbili"),
+    "Kidney Function": ("creat", "bun", "uric"),
+    "Thyroid": ("tsh", "t4"),
+    "Diabetes": ("glu", "pp_glu", "hba1c"),
+    "Vitamins & Iron": ("ferritin", "vitd", "vitb12"),
     "Inflammation": ("crp",),
 }
 
@@ -137,6 +304,15 @@ _UNIT_SYNONYMS = {
     "mmol/l": "mmol/L",
     "mg/l": "mg/L",
     "lakhs/cumm": "lakhs/cumm",
+    "u/l": "U/L",
+    "iu/l": "U/L",
+    "miu/l": "mIU/L",
+    "uiu/ml": "mIU/L",
+    "ng/dl": "ng/dL",
+    "ng/ml": "ng/mL",
+    "pg/ml": "pg/mL",
+    "umol/l": "umol/L",
+    "µmol/l": "µmol/L",
 }
 
 

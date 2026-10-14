@@ -15,14 +15,21 @@ pytestmark = pytest.mark.django_db
 def test_register_records_consent_and_jwt_login_works():
     response = APIClient().post(
         "/api/auth/register/",
-        {"username": "asha", "password": PASSWORD, "consent_store_reports": True, "consent_llm_extraction": False},
+        {
+            "username": "asha",
+            "email": "asha@test.example",
+            "password": PASSWORD,
+            "consent_store_reports": True,
+            "consent_llm_extraction": False,
+        },
     )
     assert response.status_code == 201
     user = User.objects.get(username="asha")
     assert user.role == User.Role.PATIENT
     assert list(user.consents.values_list("purpose", flat=True)) == [Consent.Purpose.STORE_REPORTS]
 
-    token = APIClient().post("/api/auth/token/", {"username": "asha", "password": PASSWORD}).data["access"]
+    # Login now uses email, not username.
+    token = APIClient().post("/api/auth/token/", {"email": "asha@test.example", "password": PASSWORD}).data["access"]
     client = APIClient()
     client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
     assert client.get("/api/auth/me/").data["role"] == "patient"
@@ -149,3 +156,29 @@ def test_staff_cannot_complete_upload_started_by_patient():
 def test_healthz_reports_ok():
     response = APIClient().get("/healthz")
     assert response.status_code == 200 and response.json() == {"status": "ok"}
+
+
+# --- sharing --------------------------------------------------------------
+
+
+def test_patient_can_share_report_and_link_resolves_without_auth():
+    patient = _patient("sharer")
+    report_id = _create_report(patient)["report"]["id"]
+
+    response = _as(patient).post(f"/api/reports/{report_id}/share/")
+    assert response.status_code == 200, response.data
+    token = response.data["url"].rsplit("/", 1)[-1]
+
+    shared = APIClient().get(f"/api/shared/{token}/")
+    assert shared.status_code == 200
+    assert shared.data["report"]["id"] == report_id
+
+
+def test_only_owning_patient_can_share_report():
+    owner = _patient("owner")
+    report_id = _create_report(owner)["report"]["id"]
+    assert _as(_patient("stranger")).post(f"/api/reports/{report_id}/share/").status_code == 404
+
+
+def test_unknown_share_token_returns_404():
+    assert APIClient().get("/api/shared/not-a-real-token/").status_code == 404

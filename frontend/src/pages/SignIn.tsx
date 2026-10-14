@@ -13,31 +13,52 @@ export function SignIn() {
   const [mode, setMode] = useState<Mode>('sign_in')
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+  const [registered, setRegistered] = useState(false)
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const form = new FormData(event.currentTarget)
-    const username = String(form.get('username') ?? '').trim()
+    const email = String(form.get('email') ?? '').trim().toLowerCase()
     const password = String(form.get('password') ?? '')
     setError(null)
     setPending(true)
     try {
       if (mode === 'sign_in') {
-        await signIn(username, password)
+        await signIn(email, password)
       } else {
         await register({
-          username,
+          username: email.split('@')[0]!.replace(/[^a-z0-9_]/gi, '_').slice(0, 150) + '_' + Math.random().toString(36).slice(2, 6),
+          email,
           password,
-          email: String(form.get('email') ?? '').trim(),
           consent_store_reports: form.get('consent_store_reports') === 'on',
           consent_llm_extraction: form.get('consent_llm_extraction') === 'on',
         })
+        setRegistered(true)
       }
     } catch (err) {
       setError(message(err))
     } finally {
       setPending(false)
     }
+  }
+
+  if (registered) {
+    return (
+      <div className="auth">
+        <div className="card">
+          <div className="stack">
+            <h1>Check your email</h1>
+            <p className="muted">
+              We sent a verification link to your email address. Click it to confirm your account. You can still use
+              MedTimeline in the meantime.
+            </p>
+            <button type="button" className="primary" onClick={() => setRegistered(false)}>
+              Back to sign in
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -66,15 +87,9 @@ export function SignIn() {
 
         <form className="stack" onSubmit={onSubmit}>
           <label>
-            Username
-            <input name="username" autoComplete="username" required />
+            Email
+            <input name="email" type="email" autoComplete="email" required />
           </label>
-          {mode === 'register' && (
-            <label>
-              Email
-              <input name="email" type="email" autoComplete="email" />
-            </label>
-          )}
           <label>
             Password
             <input
@@ -98,8 +113,8 @@ export function SignIn() {
               <label className="check">
                 <input type="checkbox" name="consent_llm_extraction" />
                 <span>
-                  Use an AI model to read my reports. Names and IDs are removed first. Without this, results are entered
-                  by review.
+                  Use an AI model to read my reports. Names and IDs are removed first. Without this, results are
+                  entered by review.
                 </span>
               </label>
             </fieldset>
