@@ -13,7 +13,7 @@ from rest_framework.views import APIView
 from accounts.models import Consent, User
 
 from . import storage
-from .models import AccessLog, Report
+from .models import AccessLog, Report, ReportShareToken
 from .serializers import ObservationSerializer, ReportCreateSerializer, ReportSerializer, ReviewSerializer
 from .services import ReviewedValue, ReviewError, apply_review
 from .tasks import extract_report
