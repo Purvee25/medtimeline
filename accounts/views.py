@@ -11,7 +11,7 @@ from rest_framework_simplejwt.views import TokenBlacklistView, TokenObtainPairVi
 
 from reports.services import erase_patient
 
-from .models import Consent, EmailVerificationToken
+from .models import Consent, EmailVerificationToken, User
 from .serializers import (
     CONSENT_POLICY_VERSION,
     EmailTokenObtainPairSerializer,
@@ -88,10 +88,12 @@ class ResendVerificationView(APIView):
     def post(self, request: Request) -> Response:
         email = request.data.get("email", "").lower()
         # Generic response regardless of whether the email exists (no enumeration).
+        generic_response = {"detail": "If that email is registered and unverified, we sent a new link."}
         try:
-            from .models import User
-
             user = User.objects.get(email__iexact=email, email_verified=False)
+        except User.DoesNotExist:
+            return Response(generic_response)
+        try:
             EmailVerificationToken.objects.filter(user=user).delete()
             token_obj = EmailVerificationToken.objects.create(user=user)
             verify_url = f"{settings.FRONTEND_URL}/verify-email?token={token_obj.token}"
@@ -103,8 +105,8 @@ class ResendVerificationView(APIView):
                 fail_silently=True,
             )
         except Exception:
-            pass
-        return Response({"detail": "If that email is registered and unverified, we sent a new link."})
+            logger.exception("Failed to resend verification email", extra={"user_id": str(user.pk)})
+        return Response(generic_response)
 
 
 class EmailTokenObtainPairView(TokenObtainPairView):

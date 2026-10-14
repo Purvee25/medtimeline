@@ -1,3 +1,4 @@
+import secrets as _secrets
 import uuid
 
 from django.conf import settings
@@ -88,9 +89,6 @@ class AccessLog(models.Model):
         indexes = [models.Index(fields=["patient", "-at"])]
 
 
-import secrets as _secrets
-
-
 SHARE_TOKEN_EXPIRY_HOURS = 72
 
 
@@ -104,11 +102,14 @@ class ReportShareToken(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.pk and not self.expires_at:
-            from django.utils import timezone
             from datetime import timedelta
+
+            from django.utils import timezone
+
             self.expires_at = timezone.now() + timedelta(hours=SHARE_TOKEN_EXPIRY_HOURS)
         super().save(*args, **kwargs)
 
     def is_valid(self) -> bool:
         from django.utils import timezone
+
         return timezone.now() < self.expires_at
