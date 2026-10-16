@@ -6,6 +6,7 @@ plus per-row validation issues and an overall `status` (`extracted` or `needs_re
 Usage:
     python -m medtimeline_extract.pipeline --reports data/synthetic --out data/predictions
     python -m medtimeline_extract.pipeline --extractor baseline --out data/predictions_baseline
+    python -m medtimeline_extract.pipeline --extractor gemini --out data/predictions_gemini
 """
 
 import argparse
@@ -14,6 +15,7 @@ import logging
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from enum import StrEnum
+from functools import partial
 from pathlib import Path
 
 import anthropic
@@ -64,13 +66,20 @@ def validate(row: ExtractedResult) -> ValidatedResult:
 Extractor = Callable[[str], Extraction]
 
 
-def analyse_report(pdf: Path, client: anthropic.Anthropic | None, extractor: Extractor | None = None) -> dict:
+def analyse_report(
+    pdf: Path,
+    client: anthropic.Anthropic | None,
+    extractor: Extractor | None = None,
+    prompt_version: str | None = None,
+) -> dict:
     """Run the full pipeline on one PDF.
 
     Args:
         pdf: Report to process.
         client: Claude client; unused when `extractor` is given.
         extractor: Text-to-results function overriding the Claude call (e.g. the rule-based baseline).
+        prompt_version: Label recorded in the prediction; defaults to "baseline" with an
+            `extractor`, else the Claude prompt version.
 
     Raises:
         Whatever text extraction or the extractor raises; callers decide on retry.
@@ -89,22 +98,41 @@ def analyse_report(pdf: Path, client: anthropic.Anthropic | None, extractor: Ext
     return {
         "status": Status.NEEDS_REVIEW if needs_review else Status.EXTRACTED,
         "text_method": method,
-        "prompt_version": "baseline" if extractor else PROMPT_VERSION,
+        "prompt_version": prompt_version or ("baseline" if extractor else PROMPT_VERSION),
         "collected_on": extraction.collected_on.isoformat() if extraction.collected_on else None,
         "results": [asdict(r) for r in rows],
     }
 
 
-def process_report(pdf: Path, client: anthropic.Anthropic | None, extractor: Extractor | None = None) -> dict:
+def process_report(
+    pdf: Path,
+    client: anthropic.Anthropic | None,
+    extractor: Extractor | None = None,
+    prompt_version: str | None = None,
+) -> dict:
     """Like `analyse_report`, but never raises: failures become status=failed."""
     try:
-        return analyse_report(pdf, client, extractor)
+        return analyse_report(pdf, client, extractor, prompt_version)
     except Exception as exc:
         logger.exception("Extraction failed", extra={"file": pdf.name})
         return {"status": Status.FAILED, "error": f"{type(exc).__name__}: {exc}", "results": []}
 
 
-EXTRACTORS = ("claude", "baseline")
+EXTRACTORS = ("claude", "baseline", "gemini")
+
+
+def _make_extractor(name: str) -> tuple[Extractor | None, str | None]:
+    """Return the extractor override and prompt-version label for `name` (None, None for Claude)."""
+    if name == "baseline":
+        return extract_baseline, "baseline"
+    if name == "gemini":
+        from google import genai
+
+        from .gemini import MODEL as GEMINI_MODEL
+        from .gemini import extract_results_gemini
+
+        return partial(extract_results_gemini, client=genai.Client()), f"{PROMPT_VERSION}+{GEMINI_MODEL}"
+    return None, None
 
 
 def run(reports_dir: Path, out_dir: Path, extractor_name: str = "claude") -> dict[str, int]:
@@ -115,12 +143,11 @@ def run(reports_dir: Path, out_dir: Path, extractor_name: str = "claude") -> dic
     if not pdfs:
         raise FileNotFoundError(f"No PDFs in {reports_dir}")
     out_dir.mkdir(parents=True, exist_ok=True)
-    use_claude = extractor_name == "claude"
-    client = anthropic.Anthropic() if use_claude else None
-    extractor = None if use_claude else extract_baseline
+    extractor, prompt_version = _make_extractor(extractor_name)
+    client = anthropic.Anthropic() if extractor is None else None
     counts: dict[str, int] = {}
     for pdf in pdfs:
-        prediction = process_report(pdf, client, extractor)
+        prediction = process_report(pdf, client, extractor, prompt_version)
         (out_dir / f"{pdf.stem}.json").write_text(json.dumps(prediction, indent=2))
         counts[prediction["status"]] = counts.get(prediction["status"], 0) + 1
         logger.info("Processed", extra={"file": pdf.name, "status": prediction["status"]})
