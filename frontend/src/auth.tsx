@@ -1,8 +1,8 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import { api, ApiError, session } from './api/client'
-import { Me, Tokens } from './api/schemas'
-import { AuthContext, type AuthState, type Registration } from './authContext'
+import { Me, Registration, Tokens } from './api/schemas'
+import { AuthContext, type AuthState } from './authContext'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
@@ -32,20 +32,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
   }, [state.status, signOut])
 
-  const signIn = useCallback(async (username: string, password: string) => {
-    const tokens = await api('/api/auth/token/', Tokens, { method: 'POST', body: { username, password }, auth: false })
+  // Login accepts email (backend resolves email → username).
+  const signIn = useCallback(async (email: string, password: string) => {
+    const tokens = await api('/api/auth/token/', Tokens, { method: 'POST', body: { email, password }, auth: false })
     session.setTokens(tokens)
     setState({ status: 'signed_in', user: await api('/api/auth/me/', Me) })
   }, [])
 
   const register = useCallback(
     async (form: Registration) => {
-      await api('/api/auth/register/', Me.pick({ id: true, username: true }), {
+      await api('/api/auth/register/', Me.pick({ id: true, username: true, email: true }), {
         method: 'POST',
         body: form,
         auth: false,
       })
-      await signIn(form.username, form.password)
+      // After registration, sign in immediately (email verification is advisory, not blocking sign-in).
+      await signIn(form.email, form.password)
     },
     [signIn],
   )
