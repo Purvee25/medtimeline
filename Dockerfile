@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM python:3.13-slim-bookworm AS build
+FROM python:3.14-slim-bookworm AS build
 WORKDIR /app
 RUN python -m venv /venv
 ENV PATH=/venv/bin:$PATH
@@ -9,7 +9,7 @@ RUN pip install --no-cache-dir $(python -c "import tomllib; print(' '.join(tomll
 COPY . .
 RUN pip install --no-cache-dir --no-deps .
 
-FROM python:3.13-slim-bookworm AS runtime
+FROM python:3.14-slim-bookworm AS runtime
 RUN apt-get update \
     && apt-get install -y --no-install-recommends tesseract-ocr poppler-utils curl \
     && rm -rf /var/lib/apt/lists/* \
