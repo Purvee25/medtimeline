@@ -1,5 +1,6 @@
 import random
 from datetime import date
+from types import SimpleNamespace
 
 import pytest
 
@@ -172,3 +173,49 @@ def test_pdf_page_limit(tmp_path, monkeypatch):
     monkeypatch.setattr(text_module, "MAX_PDF_PAGES", 0)
     with pytest.raises(ValueError, match="pages"):
         extract_text(tmp_path / "r1.pdf")
+
+
+class _FakeGeminiModels:
+    def __init__(self, text: str):
+        self.text = text
+        self.calls: list[dict] = []
+
+    def generate_content(self, **kwargs):
+        self.calls.append(kwargs)
+        return SimpleNamespace(text=self.text, usage_metadata=None)
+
+
+def test_gemini_extractor_parses_structured_response():
+    pytest.importorskip("google.genai")
+    from medtimeline_extract.gemini import MODEL, extract_results_gemini
+
+    models = _FakeGeminiModels(
+        '{"collected_on": "2026-03-01", "results": '
+        '[{"marker": "hb", "printed_name": "Haemoglobin", "value": 13.2, "unit": "g/dL"}]}'
+    )
+    out = extract_results_gemini("Haemoglobin 13.2 g/dL", SimpleNamespace(models=models))
+
+    assert out.collected_on == date(2026, 3, 1)
+    assert [(r.marker.value, r.value, r.unit) for r in out.results] == [("hb", 13.2, "g/dL")]
+    assert models.calls[0]["model"] == MODEL
+    assert "<report>" in models.calls[0]["contents"]
+
+
+def test_gemini_extractor_rejects_off_schema_response():
+    pytest.importorskip("google.genai")
+    from pydantic import ValidationError
+
+    from medtimeline_extract.gemini import extract_results_gemini
+
+    models = _FakeGeminiModels('{"results": [{"marker": "not-a-marker"}]}')
+    with pytest.raises(ValidationError):
+        extract_results_gemini("text", SimpleNamespace(models=models))
+
+
+def test_extractor_label_is_recorded_in_prediction(tmp_path, monkeypatch):
+    monkeypatch.setattr(pipeline, "extract_text", lambda pdf: ("Haemoglobin 13.0 g/dL", "text_layer"))
+    fake = lambda text: Extraction(collected_on=date(2026, 3, 1), results=[_row("hb", 13.0, "g/dL")])  # noqa: E731
+
+    prediction = process_report(tmp_path / "r1.pdf", None, fake, prompt_version="v2+gemini-test")
+
+    assert prediction["prompt_version"] == "v2+gemini-test"

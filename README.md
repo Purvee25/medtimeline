@@ -13,12 +13,18 @@ Turns diagnostic lab-report PDFs from different centers into one verified, LOINC
 
 Patients and diagnostic-center staff upload reports. A background worker extracts the results with OCR and Claude, validates every value, and stores the clean ones. Anything suspicious waits for a human to review. Patients then see each marker as a trend across labs, and can export their whole record as FHIR.
 
+## Highlights for Recruiters
+
+- **Built** an end-to-end lab-report pipeline (direct-to-S3 upload, Celery worker, OCR, LLM structured extraction, unit and plausibility validation) with human-in-the-loop review, so only verified values reach a patient's record. The rule-based extractor scores **F1 0.960** on a held-out set of 40 synthetic reports.
+- **Optimized** the patient trend query from **14.86 ms to 0.03 ms** on 100k observations (sequential scan → index scan), and made every result interoperable as LOINC-coded **FHIR R4** via a `$everything` export.
+- **Secured** health data with per-purpose consent, object-scoped access (404 across patients and centers), an append-only audit log and erasure, backed by **144 automated tests** (115 backend against Postgres, 29 frontend), including a regression test for every issue found in a multi-agent security and correctness audit.
+
 > [!WARNING]
 > **Scope: not a medical device.** Portfolio and learning project. It doesn't diagnose or give dosing advice, and it's not clinically validated. All data in this repo is synthetic; never upload real patient data.
 
 ## Contents
 
-- [Highlights](#highlights)
+- [Highlights for Recruiters](#highlights-for-recruiters)
 - [Screenshots](#screenshots)
 - [Quickstart (Docker)](#quickstart-docker)
 - [Frontend](#frontend)
@@ -29,19 +35,11 @@ Patients and diagnostic-center staff upload reports. A background worker extract
 - [Privacy, safety and security](#privacy-safety-and-security)
 - [Standards](#standards)
 - [Operations](#operations)
-- [Project status / roadmap](#project-status--roadmap)
+- [Deploy](#deploy)
+- [Planned extensions](#planned-extensions)
 - [Contributing](#contributing)
 - [Security](#security)
 - [License](#license)
-
-## Highlights
-
-- **End-to-end pipeline:** direct-to-S3 upload, Celery worker, PDF text layer or Tesseract OCR, redaction, then Claude structured output validated against unit and plausibility rules.
-- **Human in the loop:** only clean rows become observations; suspicious values wait for review.
-- **Measured, not claimed:** trend query **14.86 ms → 0.03 ms** on 100k observations; rule-based extraction F1 **0.960** on a held-out set.
-- **Standards:** LOINC-coded markers, canonical units, FHIR R4 `$everything` export.
-- **Privacy by design:** per-purpose consent, object-scoped access (404 across patients and centers), append-only audit log, erasure.
-- **Tested and typed:** 138 automated tests (109 backend against Postgres, 29 frontend), including regression tests for every issue found in a multi-agent security and correctness audit; React 19 + strict TypeScript with zod-validated API responses.
 
 ## Screenshots
 
@@ -141,6 +139,7 @@ flowchart TD
 | Concurrent `/complete` calls | Extraction queued exactly once (row lock; test fails without it) | `tests/test_audit_regressions.py` |
 | Extraction F1, rule-based baseline (held-out, 40 reports, 178 fields) | **0.960** overall: 1.000 on the 3 digital layouts, 0.829 on scans | `--extractor baseline`, see below |
 | Extraction F1, Claude | *Not yet measured: needs API credits* | see below |
+| Extraction F1, Gemini (`gemini-3.8-flash`, free tier) | *Not yet measured* | `--extractor gemini`, see below |
 
 To measure extraction accuracy:
 
@@ -148,6 +147,7 @@ To measure extraction accuracy:
 python -m medtimeline_eval.generate --n 40 --out data/synthetic --seed 7
 python -m medtimeline_extract.pipeline --extractor baseline --out data/predictions_baseline   # free, no LLM
 python -m medtimeline_extract.pipeline --out data/predictions                                 # calls Claude
+python -m medtimeline_extract.pipeline --extractor gemini --out data/predictions_gemini        # free tier; needs .[gemini] + GEMINI_API_KEY
 python -m medtimeline_eval.evaluate --truth data/synthetic --pred data/predictions_baseline
 ```
 
@@ -188,17 +188,30 @@ python -m medtimeline_eval.evaluate --truth data/synthetic --pred data/predictio
 - **CI** (`.github/workflows/ci.yml`): ruff, black, a check for missing migrations, and the full test suite against Postgres with Tesseract installed. For the frontend: lint, typecheck, Vitest and a production build.
 - **Cost:** Tesseract OCR is free. Each Claude call sends about 1–2k tokens of report text, so the 40-report evaluation costs well under $1. Set an AWS budget alert before deploying.
 
-## Project status / roadmap
+## Deploy
 
-Runs end to end locally and in Docker Compose. Not done yet:
+[Railway](https://railway.com) can host the whole stack from this repo (trial credit, then the paid Hobby plan):
+
+1. Create a project from this GitHub repo. The root `Dockerfile` becomes the **web** service; set its pre-deploy command to `python manage.py migrate --noinput`.
+2. Add **PostgreSQL** and **Redis**, then on web set `DATABASE_URL=${{Postgres.DATABASE_URL}}` and `CELERY_BROKER_URL=${{Redis.REDIS_URL}}`.
+3. Set `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS`, `FRONTEND_URL`, `ANTHROPIC_API_KEY`, and `REPORTS_BUCKET`, `AWS_REGION` and AWS credentials for an S3 bucket.
+4. Add a **worker** service from the same repo with start command `celery -A config worker --loglevel=info` and the same variables.
+5. Add a **frontend** service with root directory `frontend` and `API_UPSTREAM=http://${{web.RAILWAY_PRIVATE_DOMAIN}}:8000`.
+
+## Planned extensions
+
+Runs end to end locally and in Docker Compose, with CI on every push. Already done:
 
 - [x] Rule-based extraction baseline measured (held-out F1 0.960)
 - [x] Multi-agent audit (backend, frontend, security) with every confirmed issue fixed and regression-tested
-- [ ] Claude extraction accuracy on the same held-out set (needs API credits)
-- [ ] AWS deployment (RDS, S3, ECS or EC2) and a live demo link
-- [ ] Patient-granted care relationships (patient ↔ center) before staff can upload or read
-- [ ] `verified_by` on observations, and refresh tokens in httpOnly cookies
-- [ ] Appointment booking, webhooks, medication log
+
+Planned next, in order:
+
+- **LLM extraction accuracy:** score Claude (and Gemini, for a free comparison) on the same held-out set as the baseline.
+- **Live demo:** cloud deployment with a public link (see [Deploy](#deploy)).
+- **Patient-granted care relationships:** staff can upload or read a patient's reports only after the patient links their center.
+- **Auth hardening:** `verified_by` on observations, and refresh tokens in httpOnly cookies.
+- **Patient features:** appointment booking, webhooks and a medication log.
 
 Design trade-offs are recorded in [DECISIONS.md](DECISIONS.md).
 

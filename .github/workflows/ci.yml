@@ -33,7 +33,7 @@ jobs:
       - name: System packages (OCR)
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tesseract-ocr poppler-utils
       - name: Install
-        run: pip install -e ".[dev]"
+        run: pip install -e ".[dev,gemini]"
       - name: Lint
         run: |
           ruff check .

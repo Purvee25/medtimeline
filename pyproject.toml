@@ -23,6 +23,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+gemini = ["google-genai==2.31.0"]
 dev = ["pytest==9.1.1", "pytest-django==4.14.0", "moto==5.2.3", "ruff==0.16.10", "black==26.10.0"]
 
 [tool.pytest.ini_options]
