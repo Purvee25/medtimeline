@@ -20,5 +20,5 @@ WORKDIR /app
 ENV PATH=/venv/bin:$PATH PYTHONUNBUFFERED=1 DJANGO_SETTINGS_MODULE=config.settings
 USER app
 EXPOSE 8000
-HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD curl -fsS http://localhost:8000/healthz || exit 1
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--access-logfile", "-"]
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD curl -fsS "http://localhost:${PORT:-8000}/healthz" || exit 1
+CMD ["sh", "scripts/start-web.sh"]
