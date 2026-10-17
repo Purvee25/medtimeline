@@ -114,9 +114,12 @@ SIMPLE_JWT = {
 # Report storage (private S3 bucket; clients upload/download via short-lived pre-signed URLs)
 AWS_REGION = os.environ.get("AWS_REGION", "ap-south-1")
 REPORTS_BUCKET = os.environ.get("REPORTS_BUCKET", "medtimeline-reports-dev")
-# Endpoint the *browser* uses for pre-signed URLs. Unset on AWS; set locally when the server reaches
-# S3 under an internal hostname (e.g. http://s3:5000 in docker compose) the browser cannot resolve.
+# Endpoint the *browser* uses for pre-signed URLs. Unset on AWS; set on Railway/local when the
+# server reaches S3 via an internal hostname the browser cannot resolve.
 S3_PUBLIC_ENDPOINT_URL = os.environ.get("S3_PUBLIC_ENDPOINT_URL") or None
+# Endpoint the *server* uses to reach S3. Unset on real AWS (boto3 resolves it). Set when using
+# moto or another S3-compatible service (e.g. http://s3.railway.internal:5000).
+S3_ENDPOINT_URL = os.environ.get("S3_ENDPOINT_URL") or None
 PRESIGNED_URL_TTL_SECONDS = int(os.environ.get("PRESIGNED_URL_TTL_SECONDS", "300"))
 MAX_REPORT_BYTES = int(os.environ.get("MAX_REPORT_BYTES", str(10 * 1024 * 1024)))
 
