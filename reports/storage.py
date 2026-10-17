@@ -16,7 +16,10 @@ class UploadVerificationError(Exception):
 
 @cache
 def _client():
-    return boto3.client("s3", region_name=settings.AWS_REGION)
+    kwargs: dict = {"region_name": settings.AWS_REGION}
+    if settings.S3_ENDPOINT_URL:
+        kwargs["endpoint_url"] = settings.S3_ENDPOINT_URL
+    return boto3.client("s3", **kwargs)
 
 
 @cache
