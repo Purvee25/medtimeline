@@ -19,6 +19,7 @@ def _client():
     kwargs: dict = {"region_name": settings.AWS_REGION}
     if settings.S3_ENDPOINT_URL:
         kwargs["endpoint_url"] = settings.S3_ENDPOINT_URL
+        kwargs["config"] = Config(s3={"addressing_style": "path"})
     return boto3.client("s3", **kwargs)
 
 
@@ -27,7 +28,12 @@ def _presign_client():
     """Client used only to sign URLs the browser will call; differs from _client() in local Docker."""
     if not settings.S3_PUBLIC_ENDPOINT_URL:
         return _client()
-    return boto3.client("s3", region_name=settings.AWS_REGION, endpoint_url=settings.S3_PUBLIC_ENDPOINT_URL)
+    return boto3.client(
+        "s3",
+        region_name=settings.AWS_REGION,
+        endpoint_url=settings.S3_PUBLIC_ENDPOINT_URL,
+        config=Config(s3={"addressing_style": "path"}),
+    )
 
 
 def presigned_upload(key: str) -> dict:
