@@ -1,0 +1,22 @@
+# Reuses the same multi-stage build as the web service; only the CMD differs.
+# syntax=docker/dockerfile:1
+FROM python:3.14-slim-bookworm AS build
+WORKDIR /app
+RUN python -m venv /venv
+ENV PATH=/venv/bin:$PATH
+COPY pyproject.toml ./
+RUN pip install --no-cache-dir $(python -c "import tomllib; print(' '.join(tomllib.load(open('pyproject.toml','rb'))['project']['dependencies']))")
+COPY . .
+RUN pip install --no-cache-dir --no-deps .
+
+FROM python:3.14-slim-bookworm AS runtime
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends tesseract-ocr poppler-utils curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --create-home --uid 10001 app
+COPY --from=build /venv /venv
+COPY --chown=app:app . /app
+WORKDIR /app
+ENV PATH=/venv/bin:$PATH PYTHONUNBUFFERED=1 DJANGO_SETTINGS_MODULE=config.settings
+USER app
+CMD ["celery", "-A", "config", "worker", "--loglevel=info"]
