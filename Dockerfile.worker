@@ -19,4 +19,5 @@ COPY --chown=app:app . /app
 WORKDIR /app
 ENV PATH=/venv/bin:$PATH PYTHONUNBUFFERED=1 DJANGO_SETTINGS_MODULE=config.settings
 USER app
-CMD ["celery", "-A", "config", "worker", "--loglevel=info"]
+# Celery defaults concurrency to the host CPU count (48 on Railway), which OOMs small containers.
+CMD ["sh", "-c", "exec celery -A config worker --loglevel=info --concurrency=${CELERY_CONCURRENCY:-2}"]
