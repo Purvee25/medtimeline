@@ -1,0 +1,8 @@
+{
+  "name": "medtimeline-infra",
+  "private": true,
+  "description": "Railway infrastructure-as-code tooling for .railway/railway.ts",
+  "devDependencies": {
+    "railway": "3.16.0"
+  }
+}
