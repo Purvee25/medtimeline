@@ -93,6 +93,20 @@ def test_no_llm_consent_skips_claude(s3, tmp_path, fake_claude):
     assert report.extraction["skipped"] == "no_llm_consent"
 
 
+def test_baseline_backend_extracts_without_claude(s3, tmp_path, fake_claude, settings):
+    # Deployments without an Anthropic key used to mark every consented report FAILED.
+    settings.EXTRACTION_BACKEND = "baseline"
+    report = _uploaded_report(s3, tmp_path, _patient("alice", llm_consent=True))
+
+    status = extract_report(str(report.pk))
+
+    assert fake_claude.calls == 0
+    assert status in (Report.Status.EXTRACTED, Report.Status.NEEDS_REVIEW)
+    report.refresh_from_db()
+    assert report.extraction["prompt_version"] == "baseline"
+    assert report.extraction["results"]
+
+
 def test_task_is_idempotent(s3, tmp_path, fake_claude):
     report = _uploaded_report(s3, tmp_path, _patient("alice", llm_consent=True))
     extract_report(str(report.pk))

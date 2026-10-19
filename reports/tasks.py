@@ -7,9 +7,11 @@ from pathlib import Path
 import anthropic
 from botocore.exceptions import BotoCoreError
 from celery import shared_task
+from django.conf import settings
 from django.db import transaction
 
 from accounts.models import Consent
+from medtimeline_extract.baseline import extract_baseline
 from medtimeline_extract.pipeline import analyse_report
 
 from . import storage
@@ -67,7 +69,10 @@ def extract_report(self, report_id: str) -> str | None:
         with tempfile.TemporaryDirectory() as tmp:
             pdf = Path(tmp) / "report.pdf"
             storage.download_to(report.s3_key, pdf)
-            result = analyse_report(pdf, anthropic.Anthropic())
+            if settings.EXTRACTION_BACKEND == "baseline":
+                result = analyse_report(pdf, None, extractor=extract_baseline)
+            else:
+                result = analyse_report(pdf, anthropic.Anthropic())
     except RETRYABLE as exc:
         if self.request.retries < MAX_RETRIES:
             logger.warning("Transient extraction error, retrying", extra={"report_id": report_id})

@@ -139,6 +139,12 @@ CELERY_TASK_ACKS_LATE = True
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 CELERY_TASK_TIME_LIMIT = int(os.environ.get("CELERY_TASK_TIME_LIMIT", "300"))
 
+# How uploaded reports are read: "claude" (needs ANTHROPIC_API_KEY) or "baseline" (rule-based, runs locally).
+EXTRACTION_BACKENDS = ("claude", "baseline")
+EXTRACTION_BACKEND = os.environ.get("EXTRACTION_BACKEND", "claude")
+if EXTRACTION_BACKEND not in EXTRACTION_BACKENDS:
+    raise RuntimeError(f"EXTRACTION_BACKEND must be one of {EXTRACTION_BACKENDS}, got {EXTRACTION_BACKEND!r}")
+
 # Production transport security. TLS terminates at the load balancer / nginx, which sets
 # X-Forwarded-Proto; /healthz stays reachable over plain HTTP for container health checks.
 if not DEBUG:
