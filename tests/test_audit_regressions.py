@@ -50,7 +50,7 @@ def test_unknown_and_unconsented_patients_get_the_same_error():
 def test_concurrent_complete_queues_extraction_once(s3, monkeypatch):
     alice = _patient("alice")
     data = _create_report(alice)
-    s3.put_object(Bucket=settings.REPORTS_BUCKET, Key=data["upload"]["fields"]["key"], Body=b"%PDF-1.7 body")
+    s3.put_object(Bucket=settings.REPORTS_BUCKET, Key=data["upload"]["key"], Body=b"%PDF-1.7 body")
     queued: list[str] = []
     monkeypatch.setattr(views.extract_report, "delay", queued.append)
     real_verify = storage.verify_upload

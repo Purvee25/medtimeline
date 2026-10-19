@@ -55,7 +55,7 @@ class ReportViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.G
 
     @transaction.atomic
     def create(self, request: Request) -> Response:
-        """Register a report and return a pre-signed POST for the client to upload the PDF to S3."""
+        """Register a report and return a pre-signed PUT for the client to upload the PDF to S3."""
         serializer = ReportCreateSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         patient: User = serializer.validated_data["patient"]
@@ -73,7 +73,10 @@ class ReportViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.G
         )
         _log(request, AccessLog.Action.CREATE, report)
         return Response(
-            {"report": ReportSerializer(report).data, "upload": storage.presigned_upload(report.s3_key)},
+            {
+                "report": ReportSerializer(report).data,
+                "upload": storage.presigned_upload(report.s3_key, report.size_bytes),
+            },
             status=status.HTTP_201_CREATED,
         )
 

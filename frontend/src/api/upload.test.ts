@@ -39,7 +39,7 @@ describe('checkFile', () => {
 })
 
 describe('uploadReport', () => {
-  it('registers, posts to storage with fields before the file, then completes', async () => {
+  it('registers, PUTs the file to storage with the signed headers, then completes', async () => {
     const calls: { url: string; init?: RequestInit }[] = []
     vi.stubGlobal(
       'fetch',
@@ -47,9 +47,19 @@ describe('uploadReport', () => {
         calls.push({ url, init })
         if (url === '/api/auth/token/refresh/') return json({}, 401)
         if (url === '/api/reports/') {
-          return json({ report, upload: { url: 'https://s3.test/bucket', fields: { key: 'reports/1/a.pdf', policy: 'p' } } }, 201)
+          return json(
+            {
+              report,
+              upload: {
+                url: 'https://s3.test/bucket/reports/1/a.pdf?X-Amz-Signature=s',
+                key: 'reports/1/a.pdf',
+                headers: { 'Content-Type': 'application/pdf' },
+              },
+            },
+            201,
+          )
         }
-        if (url === 'https://s3.test/bucket') return new Response(null, { status: 204 })
+        if (url.startsWith('https://s3.test/bucket/')) return new Response(null, { status: 200 })
         if (url === '/api/reports/r1/complete/') return json(report)
         throw new Error(`unexpected ${url}`)
       }),
@@ -58,10 +68,15 @@ describe('uploadReport', () => {
     const result = await uploadReport(pdf())
 
     expect(result.status).toBe('uploaded')
-    expect(calls.map((c) => c.url)).toEqual(['/api/reports/', 'https://s3.test/bucket', '/api/reports/r1/complete/'])
+    expect(calls.map((c) => c.url)).toEqual([
+      '/api/reports/',
+      'https://s3.test/bucket/reports/1/a.pdf?X-Amz-Signature=s',
+      '/api/reports/r1/complete/',
+    ])
     expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({ original_filename: 'cbc.pdf', size_bytes: 13 })
-    const form = calls[1]?.init?.body as FormData
-    expect([...form.keys()]).toEqual(['key', 'policy', 'file'])
+    expect(calls[1]?.init?.method).toBe('PUT')
+    expect(calls[1]?.init?.headers).toEqual({ 'Content-Type': 'application/pdf' })
+    expect(calls[1]?.init?.body).toBeInstanceOf(File)
   })
 
   it('stops if storage rejects the file', async () => {
@@ -69,7 +84,7 @@ describe('uploadReport', () => {
       'fetch',
       vi.fn(async (url: string) =>
         url === '/api/reports/'
-          ? json({ report, upload: { url: 'https://s3.test/bucket', fields: {} } }, 201)
+          ? json({ report, upload: { url: 'https://s3.test/bucket/k', key: 'k', headers: {} } }, 201)
           : new Response('denied', { status: 403 }),
       ),
     )

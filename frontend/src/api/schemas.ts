@@ -62,7 +62,7 @@ export const ReportPage = z.object({
 
 export const UploadTicket = z.object({
   report: Report,
-  upload: z.object({ url: z.string(), fields: z.record(z.string(), z.string()) }),
+  upload: z.object({ url: z.string(), key: z.string(), headers: z.record(z.string(), z.string()) }),
 })
 
 export const Observation = z.object({

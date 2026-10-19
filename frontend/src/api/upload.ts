@@ -21,8 +21,8 @@ export async function checkFile(file: File): Promise<void> {
 }
 
 /**
- * Upload a report in three steps: register it, POST the file straight to S3 with the
- * pre-signed form, then ask the API to verify it (which also queues extraction).
+ * Upload a report in three steps: register it, PUT the file straight to storage with the
+ * pre-signed URL, then ask the API to verify it (which also queues extraction).
  */
 export async function uploadReport(file: File, patient?: string): Promise<Report> {
   await checkFile(file)
@@ -31,10 +31,8 @@ export async function uploadReport(file: File, patient?: string): Promise<Report
     body: { original_filename: file.name, size_bytes: file.size, ...(patient ? { patient } : {}) },
   })
 
-  const form = new FormData()
-  for (const [key, value] of Object.entries(ticket.upload.fields)) form.append(key, value)
-  form.append('file', file) // S3 requires the file to be the last field.
-  const stored = await fetch(ticket.upload.url, { method: 'POST', body: form })
+  // The URL is signed over Content-Type and Content-Length, so the body must be the exact file registered.
+  const stored = await fetch(ticket.upload.url, { method: 'PUT', headers: ticket.upload.headers, body: file })
   if (!stored.ok) throw new UploadError(`Storage rejected the upload (${stored.status}).`)
 
   return api(`/api/reports/${ticket.report.id}/complete/`, Report, { method: 'POST' })

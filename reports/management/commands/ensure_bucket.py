@@ -15,6 +15,16 @@ from django.core.management.base import BaseCommand
 from reports.storage import _client
 
 
+def _bucket_exists(client, bucket: str) -> bool:
+    try:
+        client.head_bucket(Bucket=bucket)
+    except ClientError as exc:
+        if exc.response["Error"]["Code"] in ("404", "NoSuchBucket"):
+            return False
+        raise
+    return True
+
+
 class Command(BaseCommand):
     help = "Create the reports S3 bucket if it does not already exist."
 
@@ -29,6 +39,10 @@ class Command(BaseCommand):
         for attempt in range(1, options["retries"] + 1):
             try:
                 client = _client()
+                # Bucket-scoped credentials (e.g. an R2 token) can't create buckets, so check first.
+                if _bucket_exists(client, bucket):
+                    self.stdout.write(f"Bucket '{bucket}' already exists — OK.")
+                    return
                 if region == "us-east-1":
                     client.create_bucket(Bucket=bucket)
                 else:

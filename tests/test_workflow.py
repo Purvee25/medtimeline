@@ -50,9 +50,7 @@ def fake_claude(monkeypatch):
 def _uploaded_report(s3, tmp_path, patient: User, **extra) -> Report:
     generate_report("r", "table_classic", random.Random(1), tmp_path)
     data = _create_report(patient, **extra)
-    s3.put_object(
-        Bucket=settings.REPORTS_BUCKET, Key=data["upload"]["fields"]["key"], Body=(tmp_path / "r.pdf").read_bytes()
-    )
+    s3.put_object(Bucket=settings.REPORTS_BUCKET, Key=data["upload"]["key"], Body=(tmp_path / "r.pdf").read_bytes())
     report = Report.objects.get(pk=data["report"]["id"])
     report.status = Report.Status.UPLOADED
     report.save()

@@ -1,3 +1,5 @@
+from urllib.parse import parse_qs, urlparse
+
 import pytest
 from django.conf import settings
 from rest_framework.test import APIClient
@@ -109,14 +111,16 @@ def test_create_rejects_bad_metadata(payload):
 
 def test_presigned_upload_is_scoped_to_pdf_and_size():
     upload = _create_report(_patient("alice"))["upload"]
-    assert upload["fields"]["Content-Type"] == "application/pdf"
-    assert upload["fields"]["key"].startswith("reports/")
+    query = parse_qs(urlparse(upload["url"]).query)
+    assert upload["headers"] == {"Content-Type": "application/pdf"}
+    assert upload["key"].startswith("reports/") and upload["key"] in upload["url"]
+    assert query["X-Amz-SignedHeaders"] == ["content-length;content-type;host"]
 
 
 def test_complete_accepts_real_pdf_and_logs_access(s3):
     alice = _patient("alice")
     data = _create_report(alice)
-    s3.put_object(Bucket=settings.REPORTS_BUCKET, Key=data["upload"]["fields"]["key"], Body=b"%PDF-1.7 fake body")
+    s3.put_object(Bucket=settings.REPORTS_BUCKET, Key=data["upload"]["key"], Body=b"%PDF-1.7 fake body")
 
     client = _as(alice)
     response = client.post(f"/api/reports/{data['report']['id']}/complete/")
@@ -129,7 +133,7 @@ def test_complete_accepts_real_pdf_and_logs_access(s3):
 def test_complete_rejects_and_deletes_non_pdf(s3):
     alice = _patient("alice")
     data = _create_report(alice)
-    key = data["upload"]["fields"]["key"]
+    key = data["upload"]["key"]
     s3.put_object(Bucket=settings.REPORTS_BUCKET, Key=key, Body=b"MZ\x90\x00 malware")
 
     response = _as(alice).post(f"/api/reports/{data['report']['id']}/complete/")

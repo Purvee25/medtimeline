@@ -37,18 +37,23 @@ def _presign_client():
     )
 
 
-def presigned_upload(key: str) -> dict:
-    """Pre-signed POST that only accepts a PDF up to MAX_REPORT_BYTES at exactly `key`."""
-    return _presign_client().generate_presigned_post(
-        Bucket=settings.REPORTS_BUCKET,
-        Key=key,
-        Fields={"Content-Type": PDF_CONTENT_TYPE},
-        Conditions=[
-            {"Content-Type": PDF_CONTENT_TYPE},
-            ["content-length-range", 1, settings.MAX_REPORT_BYTES],
-        ],
+def presigned_upload(key: str, size_bytes: int) -> dict:
+    """Pre-signed PUT for exactly `key`, signed over the PDF content type and the declared size.
+
+    PUT rather than POST because Cloudflare R2 has no POST-object support. The signature binds
+    Content-Length, so the client cannot upload more than it registered; verify_upload re-checks.
+    """
+    url = _presign_client().generate_presigned_url(
+        "put_object",
+        Params={
+            "Bucket": settings.REPORTS_BUCKET,
+            "Key": key,
+            "ContentType": PDF_CONTENT_TYPE,
+            "ContentLength": size_bytes,
+        },
         ExpiresIn=settings.PRESIGNED_URL_TTL_SECONDS,
     )
+    return {"url": url, "key": key, "headers": {"Content-Type": PDF_CONTENT_TYPE}}
 
 
 def presigned_download(key: str) -> str:
