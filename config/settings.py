@@ -164,6 +164,8 @@ EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
 EMAIL_USE_TLS = _env_bool("EMAIL_USE_TLS", True)
 EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+# Mail is sent inside the request; without a timeout a stalled SMTP server blocks signup until gunicorn kills it.
+EMAIL_TIMEOUT = int(os.environ.get("EMAIL_TIMEOUT", "10"))
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "MedTimeline <noreply@medtimeline.app>")
 
 # Brute-force lockout (django-axes)
