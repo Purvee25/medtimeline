@@ -1,4 +1,4 @@
-import { defineRailway, github, image, postgres, project, redis, service, volume } from "railway/iac";
+import { defineRailway, github, postgres, project, redis, service, volume } from "railway/iac";
 
 export default defineRailway(() => {
   const medtimeline = github("Purvee25/medtimeline");
@@ -17,11 +17,6 @@ export default defineRailway(() => {
     healthcheckTimeout: 30,
     replicas: { "iad": 1 },
   });
-  const s3 = service("s3", {
-    source: image("motoserver/moto:5.2.3"),
-    build: { buildEnvironment: "V3", builder: "RAILPACK" },
-    replicas: { "iad": 1 },
-  });
   const worker = service("worker", {
     source: medtimeline,
     build: { buildEnvironment: "V3", builder: "DOCKERFILE", dockerfilePath: "Dockerfile.worker" },
@@ -30,6 +25,6 @@ export default defineRailway(() => {
 
   return project("reliable-laughter", {
     variables: { managed: false },
-    resources: [web, Redis, s3, Postgres, worker, postgresVolume, redisVolume],
+    resources: [web, Redis, Postgres, worker, postgresVolume, redisVolume],
   });
 });
