@@ -103,6 +103,32 @@ def test_baseline_reads_table_dotted_and_alias_rows():
     ]
 
 
+def test_baseline_reads_column_layout_rows():
+    # pdftotext output of a hospital column layout: specimen in brackets, method glued to the
+    # value, unit before or after the value, Indian digit grouping, and wrapped rows.
+    from medtimeline_extract.baseline import extract_baseline
+
+    text = (
+        " Labelled on : 04-Mar-2026 09:10 AM      Sample Collected on: 05-Mar-2026 09:32 AM\n"
+        "HAEMOGLOBIN (Whole Blood EDTA)          13.6 Automated -SLS -Hb          g/dLFemale : 12-15\n"
+        "TOTAL RBC COUNT      (Whole Blood     Hydrodynamic Focusing      Million / 4.62Female : 3.8 - 4.8\n"
+        "EDTA  )                                                                 cu.mm\n"
+        "MCV (Whole Blood EDTA)          88 *Electrical Impedance          83 - 101          fL\n"
+        "Total Leucocyte Count (Whole Blood      Hydrodynamic Focusing      /cu.mm7,250 4000 - 10000\n"
+        "EDTA  )\n"
+        "PLATELET COUNT      (Whole Blood      Hydrodynamic Focusing      /cu.mm2,85,0001,50,000 - 4,10,000\n"
+    )
+    out = extract_baseline(text)
+
+    assert out.collected_on == date(2026, 3, 5)
+    assert [(r.marker.value, validate(r).canonical_value, validate(r).issues) for r in out.results] == [
+        ("hb", 13.6, []),
+        ("rbc", 4.62, []),
+        ("wbc", 7.25, []),
+        ("plt", 285.0, []),
+    ]
+
+
 def test_baseline_prefers_longest_label():
     from medtimeline_extract.baseline import extract_baseline
 
@@ -155,6 +181,8 @@ def test_redaction_scrubs_unlabelled_identifier_values(line, secret):
         "LDL Cholesterol 118 mg/dL 50 - 130",
         "Triglycerides 1.59 mmol/L",
         "C-Reactive Protein 4.4 mg/L 0.0 - 5.0",
+        # Value and reference range in separate columns: 11 digits in total, but not one number.
+        "ABSOLUTE NEUTROPHIL COUNT     Calculated     /cu.mm4,870     2000 - 7000",
     ],
 )
 def test_redaction_keeps_result_rows(line):
@@ -164,6 +192,11 @@ def test_redaction_keeps_result_rows(line):
 def test_redaction_salvages_collection_date_from_identifier_line():
     out = redact_identifiers("Patient: Rohan Patel   Sample collected: 2025-12-24   Report ID: rpt_001")
     assert out == "Sample collected: 2025-12-24"
+
+
+def test_redaction_salvages_month_name_collection_date():
+    out = redact_identifiers("Patient: Rohan Patel   Sample collected: 05-Mar-2026 09:32 AM")
+    assert out == "Sample collected: 05-Mar-2026"
 
 
 def test_pdf_page_limit(tmp_path, monkeypatch):

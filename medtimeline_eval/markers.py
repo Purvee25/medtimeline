@@ -38,6 +38,7 @@ class Marker:
 MG_DL_TO_MMOL_CHOL = 0.02586
 MG_DL_TO_MMOL_TG = 0.01129
 THOUSAND_PER_UL_TO_LAKH = 0.01
+THOUSAND_PER_UL_TO_PER_UL = 1000.0
 MMOL_L_TO_MG_DL_GLUCOSE = 18.016
 UMOL_L_TO_MG_DL_CREAT = 0.01131
 UMOL_L_TO_MG_DL_URIC = 0.01681
@@ -54,6 +55,7 @@ MARKERS: dict[str, Marker] = {
             (4.0, 11.0),
             (0.5, 100.0),
             ("TLC", "WBC Count", "Total WBC Count"),
+            {"/uL": THOUSAND_PER_UL_TO_PER_UL},
         ),
         Marker(
             "rbc",
@@ -73,7 +75,7 @@ MARKERS: dict[str, Marker] = {
             (150.0, 450.0),
             (10.0, 1500.0),
             ("Platelets", "PLT"),
-            {"lakhs/cumm": THOUSAND_PER_UL_TO_LAKH},
+            {"lakhs/cumm": THOUSAND_PER_UL_TO_LAKH, "/uL": THOUSAND_PER_UL_TO_PER_UL},
             decimals=0,
         ),
         Marker(
@@ -304,6 +306,16 @@ _UNIT_SYNONYMS = {
     "mmol/l": "mmol/L",
     "mg/l": "mg/L",
     "lakhs/cumm": "lakhs/cumm",
+    "million/cu.mm": "10^6/uL",
+    "million/cumm": "10^6/uL",
+    "millions/cumm": "10^6/uL",
+    "/cu.mm": "/uL",
+    "/cumm": "/uL",
+    "cells/cumm": "/uL",
+    "cells/cu.mm": "/uL",
+    "/mm3": "/uL",
+    "/ul": "/uL",
+    "cells/ul": "/uL",
     "u/l": "U/L",
     "iu/l": "U/L",
     "miu/l": "mIU/L",
@@ -331,6 +343,15 @@ def normalise_unit(unit: str) -> str:
     if match := _OCR_POWER_UNIT.match(key):
         return f"10^{match['exp']}/uL"
     return unit.strip()
+
+
+def unit_spellings(code: str) -> list[str]:
+    """Every printed spelling (lowercase, no spaces) that normalises to a unit valid for `code`."""
+    marker = MARKERS[code]
+    valid = {marker.canonical_unit, *marker.alt_units}
+    spellings = {u.replace(" ", "").lower() for u in valid}
+    spellings |= {printed for printed, canonical in _UNIT_SYNONYMS.items() if canonical in valid}
+    return sorted(spellings, key=len, reverse=True)
 
 
 def to_canonical(code: str, value: float, unit: str) -> float:

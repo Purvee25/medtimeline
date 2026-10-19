@@ -35,9 +35,15 @@ _NAME_OR_DEMOGRAPHIC_LINE = re.compile(
 )
 # Values that identify a person wherever they appear.
 _EMAIL = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
-_LONG_NUMBER = re.compile(r"\+?\d[\d\s-]{8,}\d")  # phone numbers, Aadhaar, MRNs; digit count checked below
+# Phone numbers, Aadhaar, MRNs: digits joined by at most one space or dash. A wider gap is a table
+# column boundary (e.g. a count followed by its reference range), not part of one number.
+_LONG_NUMBER = re.compile(r"\+?\d(?:[ -]?\d){8,}")  # digit count checked below
 _MIN_IDENTIFIER_DIGITS = 10
-_DATE = re.compile(r"\d{4}-\d{2}-\d{2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4}")
+_DATE = re.compile(
+    r"\d{4}-\d{2}-\d{2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4}"
+    r"|\d{1,2}[-/ ](?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[-/ ]\d{4}",
+    re.IGNORECASE,
+)
 _COLLECTION_HINT = re.compile(r"collect|sample|drawn", re.IGNORECASE)
 
 
