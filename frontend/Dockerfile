@@ -7,7 +7,7 @@ COPY . .
 RUN npm run build
 
 # Unprivileged image: runs as uid 101 and listens on 8080.
-FROM nginxinc/nginx-unprivileged:1.29-alpine AS runtime
+FROM nginxinc/nginx-unprivileged:1.31-alpine AS runtime
 # Rendered by the image's entrypoint (envsubst) into /etc/nginx/conf.d/default.conf at start-up.
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
